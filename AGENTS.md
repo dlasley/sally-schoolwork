@@ -8,7 +8,7 @@ This Python project uses the `uv` package manager. Always use `uv` to install de
 
 ### Architecture
 
-- **Tools do the analysis, LLM narrates.** 10 `@function_tool` methods call deterministic Python in `src/data/analysis.py`. The LLM never sees raw JSON — it receives pre-computed human-readable summaries.
+- **Tools do the analysis, LLM narrates.** 15 `@function_tool` methods call deterministic Python in `src/data/analysis.py`. The LLM never sees raw JSON — it receives pre-computed human-readable summaries.
 - **Local data, not API.** The `table-mutation-data` repo is cloned at prewarm and git-pulled per session. All snapshot reads are filesystem I/O.
 - **Browser navigation.** Class-specific tools auto-navigate the browser via LiveKit RPC as a side effect. Aggregate tools (list_classes, get_recent_changes, get_grade_trend) do not navigate.
 - **Persona inheritance.** `personas/base.md` (shared, templated) is concatenated with a persona-specific `persona.md` in a subdirectory at load time. `config.json` (committed) defines provider choices; `config.local.json` (gitignored) holds real names and service IDs. New personas: copy `personas/example/`, customize, add config entry.
@@ -17,7 +17,7 @@ This Python project uses the `uv` package manager. Always use `uv` to install de
 
 ### Key files
 
-- `src/agent.py` — Entrypoint. Persona loading, 10 `@function_tool` methods, `_navigate_browser` RPC helper, `SessionData` with `SnapshotReader` + `UserStore`, prewarm (clones data repo), session init (git pull, profile check, onboarding, Hedra avatar, ElevenLabs or Cartesia TTS), session end summary callback.
+- `src/agent.py` — Entrypoint. Persona loading, 15 `@function_tool` methods, `_navigate_browser` RPC helper, `SessionData` with `SnapshotReader` + `UserStore`, prewarm (clones data repo), session init (git pull, profile check, onboarding, Hedra avatar, ElevenLabs or Cartesia TTS), session end summary callback.
 - `src/data/analysis.py` — Deterministic analysis: diff, summarize, trends, flags, categories. All return human-readable strings.
 - `src/data/snapshot_reader.py` — Reads JSON snapshots from local clone. Fuzzy class name resolution via `resolve_slug()`.
 - `src/data/user_store.py` — Supabase client for user profiles, session history, and incremental message saving.

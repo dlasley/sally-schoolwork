@@ -34,7 +34,7 @@
 - Priority 1 (navigation): Removed nav from aggregate tools (list_classes, get_recent_changes, get_grade_trend). Simplified show_in_browser. Added debug logging.
 - Priority 2 (session memory): Context injection switched from role="assistant" to instructions append. Session summary now extracts topics_discussed and classes_mentioned.
 - Priority 3 (frontend): DayDetail useEffect for ?class= param changes. NavigationHandler cleanup on unmount. Error state for token fetch failures.
-- Priority 4 (tests): 72 non-LLM tests passing across 4 test files:
+- Priority 4 (tests): 88 non-LLM tests passing across 4 test files:
   - test_analysis.py: 34 tests (data models, snapshot reader, diff, analysis)
   - test_navigation.py: 19 tests (payloads, date validation, tool alignment, format helpers, timestamps)
   - test_user_store.py: 19 tests (profile CRUD, session history, messages, format methods)
@@ -72,7 +72,7 @@
 
 ```
 sally-schoolwork (this repo) — Agent backend
-  src/agent.py             — 10 tools, persona loading, session lifecycle, navigation
+  src/agent.py             — 15 tools, persona loading, session lifecycle, navigation
   src/data/analysis.py     — Deterministic analysis (tools call these, LLM narrates)
   src/data/snapshot_reader.py — Local filesystem reader for table-mutation-data clone
   src/data/user_store.py   — Supabase client for profiles and session memory
@@ -83,7 +83,7 @@ sally-schoolwork (this repo) — Agent backend
   personas/<pseudonym>/persona.md — Per-persona voice style, catchphrases (gitignored)
   personas/example/persona.md — Template for new personas (committed)
   supabase/schema.sql      — Consolidated database schema
-  tests/                   — 72 non-LLM tests + 11 LLM-dependent agent tests
+  tests/                   — 88 non-LLM tests + 11 LLM-dependent agent tests
 
 table-mutation-tracker (branch feature/livekit-agent-widget)
   frontend/components/AgentWidget.tsx  — Widget, RPC navigation, device_id
