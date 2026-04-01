@@ -101,6 +101,16 @@ lk agent logs      # Tail runtime logs
 
 Persona files are baked into the Docker image at build time. The Dockerfile installs `git` for runtime data repo cloning.
 
+### Development Philosophy
+
+Built using AI-assisted development tooling while maintaining human ownership of architectural decisions, provider selection, persona design, and privacy controls. AI accelerated implementation; system decomposition, multi-provider abstraction, and data governance were deliberate and human-directed.
+
+The focus throughout:
+- Deterministic analysis over LLM reasoning. Tools do the computation; the model only narrates. Accurate, fast, testable.
+- Provider abstraction over vendor lock-in. Avatar and voice providers are swappable per persona via config — no code changes.
+- Persona inheritance over duplication. Shared base context + per-character personality. Adding a persona is a markdown file and a config entry.
+- Navigation as side effect over explicit commands. The agent shows you what it's talking about without being asked.
+
 ### Related
 
 - [table-mutation-tracker](https://github.com/dlasley/table-mutation-tracker) — Frontend calendar UI + agent widget (branch `feature/livekit-agent-widget`)
