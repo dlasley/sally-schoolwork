@@ -126,6 +126,6 @@ Beyond documentation access, the LiveKit CLI (`lk`) supports other tasks such as
 
 ## Related docs
 
-- [PLAN.md](PLAN.md) — Full implementation plan, provider decisions, example use cases
-- [AVATAR_PROVIDERS.md](AVATAR_PROVIDERS.md) — Avatar and voice provider research and comparison
-- [PROGRESS.md](PROGRESS.md) — Session progress and next steps
+- [PLAN.md](docs/PLAN.md) — Full implementation plan, provider decisions, example use cases
+- [AVATAR_PROVIDERS.md](docs/AVATAR_PROVIDERS.md) — Avatar and voice provider research and comparison
+- [PROGRESS.md](docs/PROGRESS.md) — Session progress and next steps
