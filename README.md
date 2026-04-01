@@ -1,7 +1,7 @@
 # Sally Schoolwork
 _Voice AI Grade Assistant · LiveKit Agents · Multi-Provider Avatar + Voice · Persona System_
 
-A voice and text AI agent that answers questions about a student's grades, assignments, and changes. Users interact via a floating widget embedded in a [companion web app](https://github.com/dlasley/table-mutation-tracker), with a lip-synced avatar and cloned voice. The agent reads snapshot data from daily SIS (student information system) portal scrapes, performs deterministic analysis in Python, and narrates results conversationally.
+A voice AI agent with a lip-synced avatar that answers questions about a student's grades, assignments, and changes. Users interact via a floating widget embedded in a [companion web app](https://github.com/dlasley/table-mutation-tracker), speaking to an animated avatar with a cloned voice. The agent reads snapshot data from daily SIS (student information system) portal scrapes, performs deterministic analysis in Python, and narrates results conversationally.
 
 Built to demonstrate:
 
