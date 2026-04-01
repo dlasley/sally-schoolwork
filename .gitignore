@@ -18,9 +18,16 @@ data-repo/
 # Private assets (source media, personal files)
 private/
 
-# Persona subdirectories (persona.md + media, all private)
-personas/*/
-!personas/example/
+# Persona media files (photos, audio, video) — always private
+personas/**/*.jpg
+personas/**/*.jpeg
+personas/**/*.png
+personas/**/*.webp
+personas/**/*.m4a
+personas/**/*.mp3
+personas/**/*.wav
+personas/**/*.mp4
+personas/**/*.mov
 # Persona local config (real names, service IDs)
 personas/config.local.json
 
