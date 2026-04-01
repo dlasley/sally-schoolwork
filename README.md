@@ -106,7 +106,6 @@ Persona files are baked into the Docker image at build time. The Dockerfile inst
 - [table-mutation-tracker](https://github.com/dlasley/table-mutation-tracker) — Frontend calendar UI + agent widget (branch `feature/livekit-agent-widget`)
 - [PLAN.md](PLAN.md) — Full implementation plan, provider decisions, future phases
 - [AVATAR_PROVIDERS.md](AVATAR_PROVIDERS.md) — Avatar and voice provider research
-- [docs/voice-cloning-guide.md](docs/voice-cloning-guide.md) — ElevenLabs recording guide
 
 ### License
 

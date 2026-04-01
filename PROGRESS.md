@@ -48,7 +48,6 @@
 - Global PII scrub across all committed files (docs, tests, plan)
 - Celebrity likeness references removed
 - `private/` directory for personal media assets (gitignored)
-- Voice cloning recording guide added (`docs/voice-cloning-guide.md`)
 
 ### Planning completed (in PLAN.md)
 - Phase 6b: Multi-provider persona support (LemonSlice)

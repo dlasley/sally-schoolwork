@@ -76,9 +76,6 @@ uv run pytest tests/test_agent.py::test_offers_assistance
 uv run ruff check
 uv run ruff format
 
-# Download LiveKit docs for offline reference (~2.4 MB)
-./scripts/fetch-lk-docs.sh
-
 # Deploy to LiveKit Cloud
 lk agent deploy
 

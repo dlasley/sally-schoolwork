@@ -365,7 +365,7 @@ LemonSlice renders at 368x560 portrait. It auto-centers and crops around the fac
 
 #### Voice: ElevenLabs instant clone of your own voice
 
-1. **Record 1-2 minutes of clean audio** — see `docs/voice-cloning-guide.md` for tips and scripts
+1. **Record 1-2 minutes of clean audio**
    - Recommended: read a mix of phonetically balanced sentences (Tailored Swift) plus a short conversational ad-lib in Sally's casual style
    - Match the tone you want: upbeat, casual, direct
 2. **Upload to ElevenLabs** — Voices → Add Voice → Instant Voice Clone

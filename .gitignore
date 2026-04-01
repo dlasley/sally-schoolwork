@@ -11,8 +11,6 @@ KMS
 .pytest_cache
 .ruff_cache
 
-# Downloaded LiveKit docs (offline reference, large files)
-docs/llms*.txt
 
 # Data repo clone
 data-repo/
@@ -26,8 +24,6 @@ personas/*/
 # Persona local config (real names, service IDs)
 personas/config.local.json
 
-# Fork script (contains PII replacement mappings)
-scripts/create-public-fork.sh
 
 # Supabase local state
 supabase/.temp/
