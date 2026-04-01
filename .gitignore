@@ -25,6 +25,9 @@ personas/*/
 personas/config.local.json
 
 
+# LiveKit project config (contains deployment-specific IDs)
+livekit.toml
+
 # Supabase local state
 supabase/.temp/
 
