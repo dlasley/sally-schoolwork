@@ -1,0 +1,55 @@
+.env
+.env.*
+!.env.example
+.DS_Store
+__pycache__
+.idea
+KMS
+.venv
+.vscode
+*.egg-info
+.pytest_cache
+.ruff_cache
+
+# Downloaded LiveKit docs (offline reference, large files)
+docs/llms*.txt
+
+# Data repo clone
+data-repo/
+
+# Private assets (source media, personal files)
+private/
+
+# Persona subdirectories (persona.md + media, all private)
+personas/*/
+!personas/example/
+# Persona local config (real names, service IDs)
+personas/config.local.json
+
+# Fork script (contains PII replacement mappings)
+scripts/create-public-fork.sh
+
+# Supabase local state
+supabase/.temp/
+
+# Claude Code
+.claude/settings.local.json
+.claude/worktrees/
+
+# OpenAI Codex
+.codex/config.local.toml
+
+# Gemini CLI
+.gemini/history/
+.gemini/tmp/
+.gemini/google_accounts.json
+.gemini/installation_id
+.gemini/oauth_creds.json
+
+# Cursor
+.cursor/chat/
+.cursor/rules/*.local.mdc
+
+# GitHub CLI
+.github/personal-instructions.md
+code_review_output.log

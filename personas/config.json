@@ -1,0 +1,22 @@
+{
+  "base": "personas/base.md",
+  "personas": {
+    "avatar1": {
+      "instructions": "personas/avatar1/persona.md",
+      "avatar_provider": "hedra",
+      "tts_provider": "elevenlabs",
+      "tts_model": "cartesia/sonic-3",
+      "tts_voice": "9626c31c-bec5-4cca-baa8-f8ba9e84c8bc",
+      "llm_temperature": 0.4
+    },
+    "avatar2": {
+      "instructions": "personas/avatar2/persona.md",
+      "avatar_provider": "lemonslice",
+      "tts_provider": "elevenlabs",
+      "tts_model": "cartesia/sonic-3",
+      "tts_voice": "9626c31c-bec5-4cca-baa8-f8ba9e84c8bc",
+      "llm_temperature": 0.5
+    }
+  },
+  "default": "avatar1"
+}
