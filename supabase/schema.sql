@@ -5,7 +5,6 @@
 create table if not exists user_profiles (
   device_id text primary key,
   name text,
-  gender text,
   relation_to_student text,
   priorities text[],
   communication_preferences text,

@@ -91,7 +91,6 @@ class TestSaveProfile:
         result = store.save_profile(
             device_id="d1",
             name="Bob",
-            gender="male",
             relation_to_student="parent",
             priorities=["grades", "missing"],
             communication_preferences="brief",
@@ -101,7 +100,6 @@ class TestSaveProfile:
         call_args = tables["user_profiles"].upsert.call_args[0][0]
         assert call_args["device_id"] == "d1"
         assert call_args["name"] == "Bob"
-        assert call_args["gender"] == "male"
         assert call_args["priorities"] == ["grades", "missing"]
 
     def test_saves_partial_profile(self):
@@ -116,7 +114,6 @@ class TestSaveProfile:
         call_args = tables["user_profiles"].upsert.call_args[0][0]
         assert call_args["device_id"] == "d1"
         assert call_args["name"] == "Alice"
-        assert "gender" not in call_args
         assert "priorities" not in call_args
 
     def test_skips_none_values(self):
@@ -126,11 +123,10 @@ class TestSaveProfile:
         )
 
         store = UserStore(client)
-        store.save_profile(device_id="d1", name=None, gender=None)
+        store.save_profile(device_id="d1", name=None)
 
         call_args = tables["user_profiles"].upsert.call_args[0][0]
         assert "name" not in call_args
-        assert "gender" not in call_args
 
 
 # --- Session history ---

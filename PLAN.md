@@ -561,7 +561,6 @@ Supabase free tier provides 500 MB / 50K rows — far more than needed. Already 
 create table user_profiles (
   device_id text primary key,
   name text,
-  gender text,
   relation_to_student text,        -- parent, student themselves, grandparent, etc.
   priorities text[],                -- what they want from the app
   communication_preferences text,   -- e.g., "brief answers", "detailed"
@@ -589,7 +588,6 @@ Collected once during the first session (onboarding), updatable if the user want
 
 **Fields:**
 - `name` — what the user wants to be called
-- `gender` — for pronoun usage
 - `relation_to_student` — parent, the student, grandparent, other
 - `priorities` — what they care about (e.g., "missing assignments", "grade trends", "specific classes")
 - `communication_preferences` — brief vs. detailed, serious vs. playful

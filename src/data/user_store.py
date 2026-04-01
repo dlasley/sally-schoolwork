@@ -42,7 +42,6 @@ class UserStore:
         self,
         device_id: str,
         name: str | None = None,
-        gender: str | None = None,
         relation_to_student: str | None = None,
         priorities: list[str] | None = None,
         communication_preferences: str | None = None,
@@ -51,8 +50,6 @@ class UserStore:
         data: dict = {"device_id": device_id}
         if name is not None:
             data["name"] = name
-        if gender is not None:
-            data["gender"] = gender
         if relation_to_student is not None:
             data["relation_to_student"] = relation_to_student
         if priorities is not None:

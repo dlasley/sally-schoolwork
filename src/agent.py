@@ -504,7 +504,6 @@ class Assistant(Agent):
         self,
         context: RunContext[SessionData],
         name: str = "",
-        gender: str = "",
         relation_to_student: str = "",
         priorities: str = "",
         communication_preferences: str = "",
@@ -517,7 +516,6 @@ class Assistant(Agent):
 
         Args:
             name: The user's preferred name.
-            gender: The user's gender (for pronoun usage).
             relation_to_student: Their relation to the student — parent, the student, grandparent, etc.
             priorities: Comma-separated list of what they care about — missing assignments, grade trends, etc.
             communication_preferences: Whether they prefer brief or detailed answers.
@@ -535,7 +533,6 @@ class Assistant(Agent):
         store.save_profile(
             device_id=context.userdata.device_id,
             name=name or None,
-            gender=gender or None,
             relation_to_student=relation_to_student or None,
             priorities=priority_list,
             communication_preferences=communication_preferences or None,
