@@ -11,10 +11,14 @@ from pathlib import Path
 import pytest
 
 from data.analysis import (
+    _is_unscored,
     diff_assignments,
     find_assignment,
     get_category_breakdown,
+    get_comprehensive_summary,
+    get_deleted_assignments,
     get_grade_trend,
+    get_modified_assignments,
     list_flagged_assignments,
     summarize_all_classes,
     summarize_changes,
@@ -520,3 +524,169 @@ class TestAnalysis:
         result = get_grade_trend(reader, "geometry", days=365)
         assert "2026-03-08" in result
         assert "2026-03-10" in result
+
+    def test_comprehensive_summary(self, reader):
+        result = get_comprehensive_summary(reader, days=365)
+        assert "CURRENT GRADES" in result
+        assert "Geometry" in result
+        assert "English 10" in result
+
+    def test_comprehensive_summary_no_data(self):
+        """Comprehensive summary with empty reader returns snapshot unavailable messages."""
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            empty_reader = SnapshotReader(tmpdir)
+            result = get_comprehensive_summary(empty_reader)
+            assert "No snapshot data available" in result
+
+    def test_deleted_assignments(self, reader):
+        # Snapshot 2 has no deletions vs snapshot 1 (it only adds/modifies)
+        result = get_deleted_assignments(reader, days=365)
+        assert "No deleted" in result
+
+    def test_deleted_assignments_with_deletion(self, data_dir):
+        """Create a scenario where an assignment is deleted between snapshots."""
+        # Add a third snapshot that removes the Circumcenter Quiz
+        s3_dir = data_dir / "snapshots" / "2026-03-12" / "160000"
+        s3_geo = s3_dir / "geometry"
+        s3_geo.mkdir(parents=True)
+
+        assignments_v3 = [
+            {
+                "name": "Medians and Altitudes",
+                "due_date": "2026-03-06",
+                "category": "Homework",
+                "flags": {"missing": False, "late": True},
+                "score_raw": "20/22",
+                "points_earned": 20,
+                "points_possible": 22,
+                "percent": 91,
+                "grade": "A-",
+                "has_comments": False,
+            },
+            {
+                "name": "IXL M7Q to 80",
+                "due_date": "2026-03-10",
+                "category": "Homework",
+                "flags": {"missing": True, "late": False},
+                "score_raw": "--/20",
+                "points_earned": None,
+                "points_possible": 20,
+                "percent": None,
+                "grade": None,
+                "has_comments": False,
+            },
+        ]
+        (s3_geo / "assignments.json").write_text(json.dumps(assignments_v3))
+
+        metadata_v3 = {
+            "date": "2026-03-12",
+            "time": "160000",
+            "scrape_timestamp": "2026-03-12T16:00:00+00:00",
+            "classes": {
+                "geometry": {
+                    "course": "Geometry",
+                    "teacher": "Smith, John",
+                    "final_grade": "B",
+                    "final_percent": 83,
+                    "assignment_count": 2,
+                },
+                "english_10_honors": {
+                    "course": "English 10 (Honors)",
+                    "teacher": "Jones, Sarah",
+                    "final_grade": "D-",
+                    "final_percent": 63,
+                    "assignment_count": 12,
+                },
+            },
+        }
+        (s3_dir / "metadata.json").write_text(json.dumps(metadata_v3))
+
+        # Update rolling index to include third snapshot
+        index_path = data_dir / "index" / "rolling_index.json"
+        index_data = json.loads(index_path.read_text())
+        index_data["snapshots"].append(
+            {
+                "date": "2026-03-12",
+                "time": "160000",
+                "scrape_timestamp": "2026-03-12T16:00:00+00:00",
+                "previous_snapshot": "2026-03-10/150000",
+                "changes": {
+                    "class_level": 0,
+                    "added": 0,
+                    "modified": 0,
+                    "deleted": 1,
+                    "total": 1,
+                },
+                "classes": {
+                    "geometry": {
+                        "course": "Geometry",
+                        "final_grade": "B",
+                        "final_percent": 83,
+                        "assignment_count": 2,
+                    },
+                    "english_10_honors": {
+                        "course": "English 10 (Honors)",
+                        "final_grade": "D-",
+                        "final_percent": 63,
+                        "assignment_count": 12,
+                    },
+                },
+            }
+        )
+        index_path.write_text(json.dumps(index_data))
+
+        reader = SnapshotReader(data_dir)
+        result = get_deleted_assignments(reader, days=365)
+        assert "Circumcenter Quiz" in result
+        assert "deleted" in result
+
+    def test_modified_assignments_retroactive(self, reader):
+        # Between snapshot 1 and 2, Medians and Altitudes score changed 18/22 → 20/22
+        # Both are real scores, so this should be detected as retroactive
+        result = get_modified_assignments(reader, days=365)
+        assert "Medians and Altitudes" in result
+        assert "score_raw" in result or "percent" in result or "grade" in result
+
+    def test_modified_assignments_filters_initial_grading(self, reader):
+        # IXL M7Q was --/20 in snapshot 2 (unscored) — no prior version
+        # It was added, not modified, so it shouldn't appear
+        result = get_modified_assignments(reader, slug="geometry", days=365)
+        assert "IXL M7Q" not in result
+
+    def test_modified_assignments_class_filter(self, reader):
+        result = get_modified_assignments(reader, slug="english_10_honors", days=365)
+        assert "No retroactive" in result
+
+
+# --- _is_unscored tests ---
+
+
+class TestIsUnscored:
+    def test_none_is_unscored(self):
+        assert _is_unscored(None) is True
+
+    def test_dashes_is_unscored(self):
+        assert _is_unscored("--") is True
+
+    def test_dash_score_is_unscored(self):
+        assert _is_unscored("--/20") is True
+
+    def test_zero_is_unscored(self):
+        assert _is_unscored("0") is True
+
+    def test_empty_is_unscored(self):
+        assert _is_unscored("") is True
+
+    def test_real_score_is_not_unscored(self):
+        assert _is_unscored("18/22") is False
+
+    def test_numeric_percent_is_not_unscored(self):
+        assert _is_unscored(82) is False
+
+    def test_grade_letter_is_not_unscored(self):
+        assert _is_unscored("B+") is False
+
+    def test_zero_score_with_denominator_is_not_unscored(self):
+        assert _is_unscored("0/10") is False

@@ -109,6 +109,7 @@ class TestToolNavigationAlignment:
             "compare_dates",
             "get_flagged_assignments",
             "get_category_breakdown",
+            "show_capabilities",
         ]
         for tool_name in navigating:
             method = getattr(Assistant, tool_name, None)
@@ -128,6 +129,10 @@ class TestToolNavigationAlignment:
             "list_classes",
             "get_recent_changes",
             "get_grade_trend",
+            "get_overall_summary",
+            "get_deleted_assignments_list",
+            "get_score_changes",
+            "save_user_profile",
         ]
         for tool_name in non_navigating:
             method = getattr(Assistant, tool_name, None)
