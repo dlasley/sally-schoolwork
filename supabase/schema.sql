@@ -1,6 +1,5 @@
 -- Consolidated schema for sally-schoolwork
 -- Run this to create all tables from scratch.
--- For incremental changes, use migrations in supabase/migrations/
 
 -- User profiles: permanent properties collected during onboarding
 create table if not exists user_profiles (
