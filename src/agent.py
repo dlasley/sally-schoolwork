@@ -86,6 +86,28 @@ def load_persona(name: str | None = None) -> dict:
             "SCHOOL_NAME": "the school",
         }
 
+    # Fall back to env vars for values not in local config
+    # These are set as LiveKit Cloud secrets for deployment
+    env_fallbacks = {
+        "elevenlabs_voice_id": os.getenv("ELEVENLABS_VOICE_ID"),
+        "hedra_avatar_id": os.getenv("HEDRA_AVATAR_ID"),
+        "lemonslice_image_url": os.getenv("LEMONSLICE_IMAGE_URL"),
+        "elevenlabs_speed": os.getenv("ELEVENLABS_SPEED"),
+        "elevenlabs_stability": os.getenv("ELEVENLABS_STABILITY"),
+        "elevenlabs_similarity": os.getenv("ELEVENLABS_SIMILARITY"),
+    }
+    for key, env_val in env_fallbacks.items():
+        if env_val and key not in persona_cfg:
+            persona_cfg[key] = float(env_val) if key.startswith("elevenlabs_s") else env_val
+
+    # Template vars also fall back to env vars
+    if not local_vars.get("STUDENT_NAME") or local_vars["STUDENT_NAME"] == "the student":
+        local_vars["STUDENT_NAME"] = os.getenv("STUDENT_NAME", "the student")
+    if not local_vars.get("STUDENT_NICKNAME"):
+        local_vars["STUDENT_NICKNAME"] = os.getenv("STUDENT_NICKNAME", "")
+    if not local_vars.get("SCHOOL_NAME") or local_vars["SCHOOL_NAME"] == "the school":
+        local_vars["SCHOOL_NAME"] = os.getenv("SCHOOL_NAME", "the school")
+
     # Load and concatenate instructions
     parts = []
     if "base" in config:
@@ -94,6 +116,9 @@ def load_persona(name: str | None = None) -> dict:
     instructions = "\n\n".join(parts)
 
     # Template placeholders
+    from datetime import datetime
+
+    local_vars["CURRENT_DATE"] = datetime.now().strftime("%Y-%m-%d")
     for key, value in local_vars.items():
         instructions = instructions.replace("{{" + key + "}}", value)
 

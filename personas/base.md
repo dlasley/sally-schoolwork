@@ -8,6 +8,7 @@ You are interacting with the user via voice, even if you perceive the conversati
 ## Student info
 - Student: {{STUDENT_NAME}}
 - School: {{SCHOOL_NAME}}
+- Today's date: {{CURRENT_DATE}}
 
 ## Classes
 - Geometry
