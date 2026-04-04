@@ -782,26 +782,63 @@ personas/config.local.json
 
 `load_persona(name)` merges both configs at runtime and templates `{{STUDENT_NAME}}`/`{{SCHOOL_NAME}}` in base.md.
 
-#### Mid-session persona switching considerations
+#### Mid-session persona switching
 
-Eventual goal: user can switch persona mid-session (via voice command or frontend control). The new persona picks up the conversation history.
+Users can switch persona mid-session via voice command ("switch to avatar3", "change your look") or a frontend control. The new persona picks up the conversation history.
+
+**Approach: `update_agent` + avatar restart**
+
+LiveKit's `session.update_agent(new_agent)` swaps the active agent mid-session with different instructions and tools. Combined with stopping/starting a new avatar session, this gives full persona switching.
+
+**Flow:**
+```
+User: "Switch to avatar3" or "Change persona"
+  → switch_persona tool fires
+  → Stop current avatar session (if any)
+  → Load new persona config via load_persona(name)
+  → Create new Assistant with new persona instructions
+  → session.update_agent(new_assistant)
+  → Start new avatar session (hedra or lemonslice per config)
+  → Swap TTS (elevenlabs or cartesia per config)
+  → Agent greets in new persona's voice/style
+```
 
 **What works already:**
-- `session_messages` and `session_history` keyed by `device_id`, not persona — conversation history is shared across all personas
-- `load_persona(name)` accepts a name parameter
+- `session_messages` and `session_history` keyed by `device_id`, not persona — conversation history shared across all personas
+- `load_persona(name)` accepts a name parameter and merges configs
 - User profile (onboarding) is persona-independent — no re-onboarding on switch
+- `session.update_agent()` documented in LiveKit SDK — swaps instructions + tools
+- Avatar sessions can be started after `session.start()` (already proven)
+
+**Voice command approach:**
+- Add `switch_persona(persona_name)` as a `@function_tool`
+- The LLM maps natural language to the tool call
+- Available persona names listed in tool description so LLM knows options
+- After switch, agent greets in new persona's style
+
+**Frontend fallback (click-based):**
+- Dropdown or button in widget header
+- Sends persona name via RPC to agent
+- Agent calls switch logic internally
+- Widget updates to show new avatar video track
+
+**Open questions to investigate:**
+- Can TTS be swapped on a live `AgentSession`? May need `session.tts = new_tts` or `update_options()`. If read-only, may need to close and recreate the session (conversation context preserved in Supabase).
+- Can an avatar session be explicitly stopped? The plugin may not expose `stop()` — the avatar worker may need to disconnect from the room.
+- Should conversation context be preserved in full, or summarized at switch point?
 
 **Schema change needed:**
-- Add `persona` column to `session_messages` table so we know which character said what
+- Add `persona` column to `session_messages` table to track which character said what
 - Session summary should note which persona(s) were active
 
-**Technical investigation needed:**
-- Can `AgentSession` hot-swap TTS mid-session? Or does it require a new session?
-- Can a Hedra/LemonSlice avatar session be stopped and a new one started in the same LiveKit room?
-- If session must restart: conversation context is preserved in Supabase `session_messages`, so the new session can reload it
-- A `switch_persona` `@function_tool` or frontend RPC control would trigger the switch
-
-**Implementation deferred** — restructure the files now (this phase), implement switching later.
+**Implementation steps:**
+1. Investigate `AgentSession` TTS mutability — can `session.tts` be reassigned?
+2. Investigate avatar session stop/restart lifecycle
+3. Add `switch_persona` `@function_tool` with persona name parameter
+4. Add `persona` column to `session_messages` schema
+5. Update `session_messages` save to include active persona
+6. Frontend: add persona selector UI to widget (or rely on voice command)
+7. Test switching between avatar1 (Hedra) and avatar3 (LemonSlice) mid-session
 
 ### Phase 12: Avatar widget UI redesign
 
