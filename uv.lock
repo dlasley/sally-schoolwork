@@ -12,7 +12,7 @@ name = "agent-starter-python"
 version = "1.0.0"
 source = { editable = "." }
 dependencies = [
-    { name = "livekit-agents", extra = ["elevenlabs", "hedra", "images", "silero", "turn-detector"] },
+    { name = "livekit-agents", extra = ["elevenlabs", "hedra", "images", "lemonslice", "silero", "turn-detector"] },
     { name = "livekit-plugins-noise-cancellation" },
     { name = "python-dotenv" },
     { name = "supabase" },
@@ -27,7 +27,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "livekit-agents", extras = ["elevenlabs", "hedra", "images", "silero", "turn-detector"], specifier = "~=1.4" },
+    { name = "livekit-agents", extras = ["elevenlabs", "hedra", "images", "lemonslice", "silero", "turn-detector"], specifier = "~=1.4" },
     { name = "livekit-plugins-noise-cancellation", specifier = "~=0.2" },
     { name = "python-dotenv" },
     { name = "supabase", specifier = ">=2.28.3" },
@@ -1176,6 +1176,9 @@ hedra = [
 images = [
     { name = "pillow" },
 ]
+lemonslice = [
+    { name = "livekit-plugins-lemonslice" },
+]
 silero = [
     { name = "livekit-plugins-silero" },
 ]
@@ -1258,6 +1261,18 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/84/29/0c182b907bf81077c39c7deafeb29576a4c45f470079822bc15c173839d8/livekit_plugins_hedra-1.5.1.tar.gz", hash = "sha256:73d3119ba3f37f088e9da2aea65ce16c3309f4d883244b0e6211416772681209", size = 5135, upload-time = "2026-03-23T22:51:53.681Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/bc/67/1058df9805bd32297bbe70edddaab3ba145a4fab5563fd4b394620191b6a/livekit_plugins_hedra-1.5.1-py3-none-any.whl", hash = "sha256:02b95e8d7ba5def91510375b2f00f4b1f7456591d511920459a28a88bdac70ae", size = 5181, upload-time = "2026-03-23T22:51:52.892Z" },
+]
+
+[[package]]
+name = "livekit-plugins-lemonslice"
+version = "1.5.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "livekit-agents" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/d0/77/53e699a0557daabc3e89a96649c9bf36136b41ff08c8de717d04d73fb4d7/livekit_plugins_lemonslice-1.5.1.tar.gz", hash = "sha256:350005025724a9eca4674bbee8e7dae0b432480b332f999cb061b07945c3c135", size = 6137, upload-time = "2026-03-23T22:52:01.932Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/9a/5d/4d830b2b4334587b68579eef026a6f0f2bfb7a24016f14ff5d7c36d3dd12/livekit_plugins_lemonslice-1.5.1-py3-none-any.whl", hash = "sha256:028b1a1e35f9571d37e80ab66107dc023fc452b62eab8256fe4787c2c41d8b1b", size = 6910, upload-time = "2026-03-23T22:52:01.2Z" },
 ]
 
 [[package]]

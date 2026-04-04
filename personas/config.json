@@ -16,6 +16,14 @@
       "tts_model": "cartesia/sonic-3",
       "tts_voice": "9626c31c-bec5-4cca-baa8-f8ba9e84c8bc",
       "llm_temperature": 0.5
+    },
+    "avatar3": {
+      "instructions": "personas/avatar3/persona.md",
+      "avatar_provider": "lemonslice",
+      "tts_provider": "elevenlabs",
+      "tts_model": "cartesia/sonic-3",
+      "tts_voice": "9626c31c-bec5-4cca-baa8-f8ba9e84c8bc",
+      "llm_temperature": 0.4
     }
   },
   "default": "avatar1"

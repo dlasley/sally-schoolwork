@@ -98,10 +98,15 @@ def load_persona(name: str | None = None) -> dict:
     }
     for key, env_val in env_fallbacks.items():
         if env_val and key not in persona_cfg:
-            persona_cfg[key] = float(env_val) if key.startswith("elevenlabs_s") else env_val
+            persona_cfg[key] = (
+                float(env_val) if key.startswith("elevenlabs_s") else env_val
+            )
 
     # Template vars also fall back to env vars
-    if not local_vars.get("STUDENT_NAME") or local_vars["STUDENT_NAME"] == "the student":
+    if (
+        not local_vars.get("STUDENT_NAME")
+        or local_vars["STUDENT_NAME"] == "the student"
+    ):
         local_vars["STUDENT_NAME"] = os.getenv("STUDENT_NAME", "the student")
     if not local_vars.get("STUDENT_NICKNAME"):
         local_vars["STUDENT_NICKNAME"] = os.getenv("STUDENT_NICKNAME", "")
@@ -664,15 +669,15 @@ async def my_agent(ctx: JobContext):
     if context_parts:
         instructions = instructions + "\n\n" + "\n\n".join(context_parts)
 
-    # Configure TTS: ElevenLabs (cloned voice) or Cartesia (default)
-    elevenlabs_voice = persona.get("elevenlabs_voice_id")
-    if elevenlabs_voice:
+    # Configure TTS based on provider
+    tts_provider = persona.get("tts_provider", "cartesia")
+    if tts_provider == "elevenlabs" and persona.get("elevenlabs_voice_id"):
         tts = elevenlabs.TTS(
-            voice_id=elevenlabs_voice,
+            voice_id=persona["elevenlabs_voice_id"],
             voice_settings=elevenlabs.VoiceSettings(
-                stability=persona.get("elevenlabs_stability", 0.5),
-                similarity_boost=persona.get("elevenlabs_similarity", 0.75),
-                speed=persona.get("elevenlabs_speed", 0.85),
+                stability=float(persona.get("elevenlabs_stability", 0.5)),
+                similarity_boost=float(persona.get("elevenlabs_similarity", 0.75)),
+                speed=float(persona.get("elevenlabs_speed", 0.85)),
             ),
         )
     else:
@@ -703,14 +708,25 @@ async def my_agent(ctx: JobContext):
         preemptive_generation=True,
     )
 
-    # Start Hedra avatar if configured (non-fatal — agent works without it)
-    avatar_id = persona.get("hedra_avatar_id")
-    if avatar_id:
-        try:
-            avatar = hedra.AvatarSession(avatar_id=avatar_id)
+    # Start avatar if configured (non-fatal — agent works without it)
+    avatar_provider = persona.get("avatar_provider")
+    try:
+        if avatar_provider == "hedra" and persona.get("hedra_avatar_id"):
+            avatar = hedra.AvatarSession(avatar_id=persona["hedra_avatar_id"])
             await avatar.start(session, room=ctx.room)
-        except Exception:
-            logger.exception("Hedra avatar failed to start, continuing without avatar")
+        elif avatar_provider == "lemonslice" and persona.get("lemonslice_image_url"):
+            from livekit.plugins import lemonslice
+
+            avatar = lemonslice.AvatarSession(
+                agent_image_url=persona["lemonslice_image_url"],
+                agent_prompt=persona.get("lemonslice_agent_prompt", ""),
+            )
+            await avatar.start(session, room=ctx.room)
+    except Exception:
+        logger.exception(
+            "%s avatar failed to start, continuing without avatar",
+            avatar_provider,
+        )
 
     await session.start(
         agent=Assistant(instructions=instructions),
