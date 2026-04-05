@@ -124,6 +124,45 @@ When possible, add tests for agent behavior. Read the [documentation](https://do
 
 Important: When modifying core agent behavior such as instructions, tool descriptions, and tasks/workflows/handoffs, never just guess what will work. Always use test-driven development (TDD) and begin by writing tests for the desired behavior. For instance, if you're planning to add a new tool, write one or more tests for the tool's behavior, then iterate on the tool until the tests pass correctly. This will ensure you are able to produce a working, reliable agent for the user.
 
+### Live session testing protocol
+
+Follow this checklist **every time** before running a live voice session. Skipping steps has caused hours of wasted debugging.
+
+1. **Kill all agent processes** — `ps aux | grep "agent.py\|multiprocessing" | grep -v grep | awk '{print $2}' | xargs kill 2>/dev/null`. The `dev` command spawns child processes that survive their parent and silently steal dispatches.
+2. **Confirm no cloud agent** — `lk agent list` must show no deployed agents (unless intentionally testing a deploy).
+3. **Start with `start`, not `dev`** — `uv run python src/agent.py start` produces full JSON logs. The `dev` file watcher spawns subprocesses whose logs may not appear in the terminal.
+4. **Verify dispatch routing** — after connecting, confirm `"received job request"` appears in the terminal. If it doesn't, dispatches are going elsewhere (orphaned workers, stale registration).
+5. **Check for errors in logs** — look for ERROR/WARNING lines after the session. Common: Deepgram 429 (rate limit), avatar init failures, Supabase connection errors. The service health summary is logged at session close.
+6. **Space sessions 30+ seconds apart** — rapid reconnects trigger Deepgram rate limits. If you see 429s, wait 60 seconds.
+7. **Test one variable at a time** — don't change code + persona + avatar provider in the same session. Isolate the variable being tested.
+8. **Record session IDs** — note the session_id from logs for each test so failures can be traced in Supabase session_messages.
+
+### Coding practices for external service calls
+
+All code that calls an external service **must** follow these patterns. Silent failures in remote calls have been the #1 source of debugging time in this project.
+
+**1. Wrap with ServiceHealth.** Every new external dependency must be registered with `ServiceHealth` and called through `health.check_service()` (async) or `health.check_service_sync()` (sync). Never use bare try/except for remote calls.
+
+```python
+# WRONG — silent failure, no visibility
+try:
+    result = some_api.call()
+except Exception:
+    logger.exception("API failed")
+
+# RIGHT — tracked, logged, tier-appropriate degradation
+health.register("some_api", ServiceTier.IMPORTANT)
+result = health.check_service_sync("some_api", some_api.call)
+```
+
+**2. Choose the correct tier.** CRITICAL (STT, LLM, TTS) blocks session start. IMPORTANT (Supabase, git) degrades gracefully. OPTIONAL (avatar, RPC, background tasks) continues normally. When in doubt, use IMPORTANT — it's better to warn than to crash or to hide.
+
+**3. Write tests for the failure path, not just the happy path.** When adding a new service call, add a test that verifies the agent behaves correctly when that service is down. Use `ServiceHealth.mark_failed()` in tests to simulate outages.
+
+**4. No hardcoded data from external sources.** If a value comes from an external system (class names, user data, API responses), don't hardcode it elsewhere. Use the authoritative source at runtime. Example: the session close handler builds its class keyword map dynamically from the `SnapshotReader` rolling index, not from a hardcoded dict.
+
+**5. Log the service health summary.** The `health.summary()` is logged at session close. If adding a new lifecycle event that should report health (e.g., a mid-session checkpoint), call `health.summary()` there too.
+
 ## LiveKit CLI
 
 Beyond documentation access, the LiveKit CLI (`lk`) supports other tasks such as managing SIP trunks for telephony-based agents. Run `lk --help` to explore available commands.

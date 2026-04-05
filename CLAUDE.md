@@ -37,3 +37,5 @@ lk agent logs                                     # Tail runtime logs
 **All remote service calls go through `ServiceHealth`.** The `ServiceHealth` class in `src/service_health.py` wraps every external call (Supabase, git, avatar, summarizer) with consistent error logging, tier-based degradation, and session start gating. When adding a new external dependency, register it with a tier and use `health.check_service()` or `health.check_service_sync()` — never bare try/except.
 
 **Use `start` not `dev` for debugging.** `uv run python src/agent.py start` produces full JSON logs in the terminal. The `dev` command uses a file watcher that spawns child processes whose logs may not appear. Always kill orphaned multiprocessing workers before restarting: `ps aux | grep "agent.py\|multiprocessing" | grep -v grep | awk '{print $2}' | xargs kill 2>/dev/null`.
+
+**Follow the live testing protocol and coding practices in AGENTS.md.** The "Testing" section contains a mandatory pre-session checklist and coding rules for external service calls. These exist because silent failures in remote calls and orphaned processes have caused repeated multi-hour debugging sessions.
