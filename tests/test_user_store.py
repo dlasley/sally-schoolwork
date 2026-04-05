@@ -93,7 +93,6 @@ class TestSaveProfile:
             name="Bob",
             relation_to_student="parent",
             priorities=["grades", "missing"],
-            communication_preferences="brief",
         )
 
         assert result["name"] == "Bob"
@@ -232,13 +231,11 @@ class TestFormatMethods:
             {
                 "name": "Dave",
                 "relation_to_student": "parent",
-                "communication_preferences": "brief",
                 "priorities": ["missing assignments", "grade trends"],
             }
         )
         assert "Dave" in result
         assert "parent" in result
-        assert "brief" in result
         assert "missing assignments" in result
 
     def test_format_profile_context_empty(self):
@@ -272,3 +269,42 @@ class TestFormatMethods:
         store = UserStore(MagicMock())
         result = store.format_session_context([])
         assert result == ""
+
+
+# --- save_session with session_id ---
+
+
+class TestSaveSessionWithSessionId:
+    def test_save_session_includes_session_id(self):
+        client, tables = _mock_client()
+        store = UserStore(client)
+        store.save_session(
+            device_id="d1",
+            summary="Test session",
+            session_id="sess-abc-123",
+        )
+        call_args = tables["session_history"].insert.call_args[0][0]
+        assert call_args["session_id"] == "sess-abc-123"
+
+    def test_save_session_omits_session_id_when_none(self):
+        client, tables = _mock_client()
+        store = UserStore(client)
+        store.save_session(device_id="d1", summary="No ID")
+        call_args = tables["session_history"].insert.call_args[0][0]
+        assert "session_id" not in call_args
+
+
+# --- update_session_summary ---
+
+
+class TestUpdateSessionSummary:
+    def test_update_session_summary(self):
+        client, tables = _mock_client()
+        # Add update to the mock chain
+        tables["session_history"].update.return_value = tables["session_history"]
+        store = UserStore(client)
+        store.update_session_summary("sess-abc-123", "New LLM summary")
+        tables["session_history"].update.assert_called_once_with(
+            {"summary": "New LLM summary"}
+        )
+        tables["session_history"].eq.assert_called_with("session_id", "sess-abc-123")

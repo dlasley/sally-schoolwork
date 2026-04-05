@@ -1,10 +1,13 @@
 import asyncio
+import contextlib
 import json
 import logging
 import os
+import re
 import subprocess
 import uuid
 from dataclasses import dataclass, field
+from datetime import date, datetime, timedelta
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -32,6 +35,7 @@ from data.analysis import (
     get_deleted_assignments,
     get_grade_trend,
     get_modified_assignments,
+    get_ungraded_assignments,
     list_flagged_assignments,
     summarize_all_classes,
     summarize_changes,
@@ -39,8 +43,13 @@ from data.analysis import (
 )
 from data.snapshot_reader import SnapshotReader
 from data.user_store import UserStore, get_supabase_client
+from service_health import ServiceHealth, ServiceTier
 
 logger = logging.getLogger("agent")
+
+# Suppress noisy HTTP/2 debug loggers that drown out agent logs
+for _noisy in ("hpack", "httpcore", "httpx", "h2"):
+    logging.getLogger(_noisy).setLevel(logging.WARNING)
 
 load_dotenv(".env.local")
 
@@ -48,6 +57,53 @@ DATA_REPO_URL = os.getenv(
     "DATA_REPO_URL", "git@github.com:dlasley/table-mutation-data.git"
 )
 DATA_REPO_PATH = Path(os.getenv("DATA_REPO_PATH", "./data-repo"))
+
+
+# --- Date resolution ---
+
+
+def resolve_relative_date(description: str, today: date) -> date | None:
+    """Resolve a natural language date description to a date object.
+
+    Pure date arithmetic — no LiveKit or data dependencies.
+    Returns None if the description cannot be resolved.
+    """
+    desc = description.lower().strip()
+    day_map = {
+        "monday": 0,
+        "tuesday": 1,
+        "wednesday": 2,
+        "thursday": 3,
+        "friday": 4,
+        "saturday": 5,
+        "sunday": 6,
+    }
+
+    # If description contains an ISO date, use it as the reference point
+    # e.g. "the Friday before 2026-04-03" -> compute Friday relative to April 3rd
+    reference_date = today
+    iso_match = re.search(r"(\d{4}-\d{2}-\d{2})", description)
+    if iso_match:
+        with contextlib.suppress(ValueError):
+            reference_date = date.fromisoformat(iso_match.group(1))
+
+    # "before" means go one additional week back past the nearest occurrence
+    extra_weeks = 1 if "before" in desc else 0
+
+    if desc in ("today",):
+        return today
+    elif desc in ("yesterday",):
+        return today - timedelta(days=1)
+    else:
+        for day_name, weekday in day_map.items():
+            if day_name in desc:
+                days_back = (reference_date.weekday() - weekday) % 7
+                if days_back == 0 and extra_weeks == 0:
+                    days_back = 7  # "last X" when today is X means previous week
+                days_back += extra_weeks * 7
+                return reference_date - timedelta(days=days_back)
+
+    return None
 
 
 # --- Persona loading ---
@@ -121,8 +177,6 @@ def load_persona(name: str | None = None) -> dict:
     instructions = "\n\n".join(parts)
 
     # Template placeholders
-    from datetime import datetime
-
     local_vars["CURRENT_DATE"] = datetime.now().strftime("%Y-%m-%d")
     for key, value in local_vars.items():
         instructions = instructions.replace("{{" + key + "}}", value)
@@ -151,6 +205,10 @@ class Assistant(Agent):
     def __init__(self, instructions: str) -> None:
         super().__init__(instructions=instructions)
 
+    @staticmethod
+    def _class_not_found(name: str) -> str:
+        return f"Could not find a class matching '{name}'. Ask the user to clarify."
+
     async def _navigate_browser(
         self, date: str = "", slug: str = "", compare_date: str = ""
     ) -> None:
@@ -167,7 +225,11 @@ class Assistant(Agent):
             if not target:
                 return
 
-            payload_dict: dict = {"view": "day" if date else "calendar", "date": date, "className": slug}
+            payload_dict: dict = {
+                "view": "day" if date else "calendar",
+                "date": date,
+                "className": slug,
+            }
             if compare_date:
                 reader = get_job_context().proc.userdata["reader"]
                 times = reader.list_snapshot_times(compare_date)
@@ -198,29 +260,7 @@ class Assistant(Agent):
         Args:
             description: Natural language date description, e.g. 'last Friday'.
         """
-        from datetime import date, timedelta
-
-        today = date.today()
-        desc = description.lower().strip()
-        day_map = {
-            "monday": 0, "tuesday": 1, "wednesday": 2, "thursday": 3,
-            "friday": 4, "saturday": 5, "sunday": 6,
-        }
-
-        resolved: date | None = None
-
-        if desc in ("today",):
-            resolved = today
-        elif desc in ("yesterday",):
-            resolved = today - timedelta(days=1)
-        else:
-            for day_name, weekday in day_map.items():
-                if day_name in desc:
-                    days_back = (today.weekday() - weekday) % 7
-                    if days_back == 0:
-                        days_back = 7  # "last X" when today is X means previous week
-                    resolved = today - timedelta(days=days_back)
-                    break
+        resolved = resolve_relative_date(description, date.today())
 
         reader = context.userdata.reader
         available = reader.list_snapshot_dates()
@@ -266,7 +306,7 @@ class Assistant(Agent):
         reader = context.userdata.reader
         slug = reader.resolve_slug(class_name)
         if not slug:
-            return f"Could not find a class matching '{class_name}'. Ask the user to clarify."
+            return self._class_not_found(class_name)
         coords = reader.latest_snapshot_coords()
         if not coords:
             return "No snapshot data available."
@@ -298,11 +338,10 @@ class Assistant(Agent):
         reader = context.userdata.reader
         slug = reader.resolve_slug(class_name)
         if not slug:
-            return f"Could not find a class matching '{class_name}'. Ask the user to clarify."
+            return self._class_not_found(class_name)
         available = reader.list_snapshot_dates()
         resolved_date = date if (date and date in available) else None
         if resolved_date:
-            times = reader.list_snapshot_times(resolved_date)
             nav_date = resolved_date
         else:
             coords = reader.latest_snapshot_coords()
@@ -331,7 +370,7 @@ class Assistant(Agent):
         if class_name:
             slug = reader.resolve_slug(class_name)
             if not slug:
-                return f"Could not find a class matching '{class_name}'. Ask the user to clarify."
+                return self._class_not_found(class_name)
         return summarize_changes(reader, slug=slug, days=days)
 
     @function_tool()
@@ -352,7 +391,7 @@ class Assistant(Agent):
         reader = context.userdata.reader
         slug = reader.resolve_slug(class_name)
         if not slug:
-            return f"Could not find a class matching '{class_name}'. Ask the user to clarify."
+            return self._class_not_found(class_name)
         coords = reader.latest_snapshot_coords()
         if coords:
             await self._navigate_browser(date=coords[0], slug=slug)
@@ -379,7 +418,7 @@ class Assistant(Agent):
         reader = context.userdata.reader
         slug = reader.resolve_slug(class_name)
         if not slug:
-            return f"Could not find a class matching '{class_name}'. Ask the user to clarify."
+            return self._class_not_found(class_name)
 
         # Find the latest snapshot time for each date
         times1 = reader.list_snapshot_times(date1)
@@ -413,7 +452,7 @@ class Assistant(Agent):
         if class_name:
             slug = reader.resolve_slug(class_name)
             if not slug:
-                return f"Could not find a class matching '{class_name}'. Ask the user to clarify."
+                return self._class_not_found(class_name)
         coords = reader.latest_snapshot_coords()
         if coords:
             await self._navigate_browser(date=coords[0], slug=slug or "")
@@ -436,7 +475,7 @@ class Assistant(Agent):
         reader = context.userdata.reader
         slug = reader.resolve_slug(class_name)
         if not slug:
-            return f"Could not find a class matching '{class_name}'. Ask the user to clarify."
+            return self._class_not_found(class_name)
         coords = reader.latest_snapshot_coords()
         if coords:
             await self._navigate_browser(date=coords[0], slug=slug)
@@ -461,7 +500,7 @@ class Assistant(Agent):
         reader = context.userdata.reader
         slug = reader.resolve_slug(class_name)
         if not slug:
-            return f"Could not find a class matching '{class_name}'. Ask the user to clarify."
+            return self._class_not_found(class_name)
         return get_grade_trend(reader, slug, days=days)
 
     @function_tool()
@@ -505,7 +544,7 @@ class Assistant(Agent):
         if class_name:
             slug = reader.resolve_slug(class_name)
             if not slug:
-                return f"Could not find a class matching '{class_name}'. Ask the user to clarify."
+                return self._class_not_found(class_name)
         return get_deleted_assignments(reader, slug=slug, days=days)
 
     @function_tool()
@@ -529,7 +568,7 @@ class Assistant(Agent):
         if class_name:
             slug = reader.resolve_slug(class_name)
             if not slug:
-                return f"Could not find a class matching '{class_name}'. Ask the user to clarify."
+                return self._class_not_found(class_name)
         return get_modified_assignments(reader, slug=slug, days=days)
 
     @function_tool()
@@ -592,13 +631,34 @@ class Assistant(Agent):
         return "Showing it in the browser now."
 
     @function_tool()
+    async def get_ungraded_assignments(
+        self,
+        context: RunContext[SessionData],
+        class_name: str = "",
+    ):
+        """List assignments that have no score entered yet, sorted by point value descending.
+
+        Use this tool when the user asks about ungraded work, assignments with no score,
+        pending grades, or the highest-value work not yet scored.
+
+        Args:
+            class_name: Optional class name to filter. Leave empty for all classes.
+        """
+        reader = context.userdata.reader
+        slug = None
+        if class_name:
+            slug = reader.resolve_slug(class_name)
+            if not slug:
+                return self._class_not_found(class_name)
+        return get_ungraded_assignments(reader, slug=slug)
+
+    @function_tool()
     async def save_user_profile(
         self,
         context: RunContext[SessionData],
         name: str = "",
         relation_to_student: str = "",
         priorities: str = "",
-        communication_preferences: str = "",
     ):
         """Save the user's profile information collected during onboarding.
 
@@ -610,7 +670,6 @@ class Assistant(Agent):
             name: The user's preferred name.
             relation_to_student: Their relation to the student — parent, the student, grandparent, etc.
             priorities: Comma-separated list of what they care about — missing assignments, grade trends, etc.
-            communication_preferences: Whether they prefer brief or detailed answers.
         """
         store = context.userdata.user_store
         if not store:
@@ -627,10 +686,68 @@ class Assistant(Agent):
             name=name or None,
             relation_to_student=relation_to_student or None,
             priorities=priority_list,
-            communication_preferences=communication_preferences or None,
         )
         context.userdata.needs_onboarding = False
         return "Profile saved."
+
+
+# --- Deferred summarization ---
+
+
+def _is_placeholder_summary(summary: str) -> bool:
+    return bool(
+        re.match(
+            r"^(Discussed .+\(\d+ messages\)\.|Conversation with \d+ messages\.)",
+            summary.strip(),
+        )
+    )
+
+
+async def _upgrade_session_summary(last_session: dict, user_store) -> None:
+    """Upgrade a placeholder summary with an LLM-generated one.
+
+    Runs as a background task at session start. All blocking Supabase calls
+    are wrapped in asyncio.to_thread() to avoid blocking the event loop.
+    """
+    from openai import AsyncOpenAI
+
+    prev_session_id = last_session.get("session_id")
+    if not prev_session_id:
+        return
+    if not _is_placeholder_summary(last_session.get("summary", "")):
+        return
+
+    try:
+        messages = await asyncio.to_thread(
+            user_store.get_session_messages, prev_session_id
+        )
+        if len(messages) < 2:
+            return
+
+        transcript = "\n".join(f"{m['role']}: {m['content']}" for m in messages)
+        client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+        completion = await client.chat.completions.create(
+            model="gpt-4.1-mini",
+            messages=[
+                {
+                    "role": "user",
+                    "content": (
+                        "Summarize this grade-tracking conversation in 2-3 sentences. "
+                        "Focus on what classes were discussed, what the user was concerned "
+                        "about, and any notable findings (grade changes, missing work, trends).\n\n"
+                        f"{transcript}"
+                    ),
+                }
+            ],
+        )
+        new_summary = (completion.choices[0].message.content or "").strip()
+        if new_summary:
+            await asyncio.to_thread(
+                user_store.update_session_summary, prev_session_id, new_summary
+            )
+            logger.info("Upgraded session summary for %s", prev_session_id)
+    except Exception:
+        logger.exception("Failed to upgrade session summary for %s", prev_session_id)
 
 
 # --- Server setup ---
@@ -675,18 +792,167 @@ def prewarm(proc: JobProcess):
 server.setup_fnc = prewarm
 
 
+def _build_user_context(
+    health: ServiceHealth,
+    user_store: UserStore | None,
+    device_id: str,
+    ip_address: str | None,
+) -> tuple[bool, list[str], str | None]:
+    """Check user profile and build context parts for LLM instructions.
+
+    Returns (needs_onboarding, context_parts, user_name).
+    """
+    needs_onboarding = False
+    context_parts: list[str] = []
+    user_name = None
+
+    if not user_store or device_id.startswith("unknown-"):
+        return needs_onboarding, context_parts, user_name
+
+    profile = health.check_service_sync("supabase", user_store.get_profile, device_id)
+    if profile:
+        user_name = profile.get("name")
+        profile_context = user_store.format_profile_context(profile)
+        if profile_context:
+            context_parts.append(f"## Current user\n{profile_context}")
+
+        sessions = (
+            health.check_service_sync(
+                "supabase", user_store.get_recent_sessions, device_id, 5
+            )
+            or []
+        )
+        session_context = user_store.format_session_context(sessions)
+        if session_context:
+            context_parts.append(
+                f"## Recent sessions\n{session_context}\n"
+                "When the user asks about previous conversations, reference "
+                "these summaries. Never say you don't have access to prior "
+                "conversations."
+            )
+
+        # Background: upgrade last session's placeholder summary with LLM
+        if sessions:
+            _upgrade_task = asyncio.create_task(  # noqa: RUF006
+                health.check_service(
+                    "summarizer",
+                    _upgrade_session_summary(sessions[-1], user_store),
+                ),
+                name="upgrade_session_summary",
+            )
+    elif health.get_state("supabase").status.value == "healthy":
+        # Profile query succeeded but returned None — new user
+        needs_onboarding = True
+        health.check_service_sync(
+            "supabase",
+            user_store.save_profile,
+            device_id=device_id,
+            ip_address=ip_address,
+        )
+        context_parts.append(
+            "## New user\n"
+            "This user has never spoken to you before. You MUST complete onboarding "
+            "before answering any other questions. Follow the onboarding script in your "
+            "instructions exactly — one question at a time. Do not skip onboarding even "
+            "if the user asks you something else first."
+        )
+
+    return needs_onboarding, context_parts, user_name
+
+
+def _build_data_context(reader: SnapshotReader) -> list[str]:
+    """Build context parts from snapshot data (grades overview, available dates)."""
+    context_parts: list[str] = []
+
+    class_overview = summarize_all_classes(reader)
+    if class_overview:
+        context_parts.append(f"## Current grades\n{class_overview}")
+
+    available_dates = reader.list_snapshot_dates()
+    if available_dates:
+        day_names = [
+            "Monday",
+            "Tuesday",
+            "Wednesday",
+            "Thursday",
+            "Friday",
+            "Saturday",
+            "Sunday",
+        ]
+        annotated = []
+        for d in available_dates:
+            try:
+                parsed = date.fromisoformat(d)
+                annotated.append(f"{d} ({day_names[parsed.weekday()]})")
+            except ValueError:
+                annotated.append(d)
+        dates_str = ", ".join(annotated)
+        context_parts.append(
+            f"## Available snapshot dates\n"
+            f"Data exists for these dates only: {dates_str}\n"
+            f"Use the day names to resolve relative date references like 'last Friday'. "
+            f"Never claim data is unavailable for a date in this list."
+        )
+
+    return context_parts
+
+
+def _configure_tts(persona: dict):
+    """Create TTS instance based on persona provider config."""
+    tts_provider = persona.get("tts_provider", "cartesia")
+    if tts_provider == "elevenlabs" and persona.get("elevenlabs_voice_id"):
+        return elevenlabs.TTS(
+            voice_id=persona["elevenlabs_voice_id"],
+            voice_settings=elevenlabs.VoiceSettings(
+                stability=float(persona.get("elevenlabs_stability", 0.5)),
+                similarity_boost=float(persona.get("elevenlabs_similarity", 0.75)),
+                speed=float(persona.get("elevenlabs_speed", 0.85)),
+            ),
+        )
+    return inference.TTS(
+        model=persona.get("tts_model", "cartesia/sonic-3"),
+        voice=persona.get("tts_voice", "9626c31c-bec5-4cca-baa8-f8ba9e84c8bc"),
+    )
+
+
+async def _start_avatar(health: ServiceHealth, persona: dict, session, room) -> None:
+    """Start avatar session if configured (optional, non-fatal)."""
+    avatar_provider = persona.get("avatar_provider")
+    if avatar_provider == "hedra" and persona.get("hedra_avatar_id"):
+        avatar = hedra.AvatarSession(avatar_id=persona["hedra_avatar_id"])
+        await health.check_service("avatar", avatar.start(session, room=room))
+    elif avatar_provider == "lemonslice" and persona.get("lemonslice_image_url"):
+        from livekit.plugins import lemonslice
+
+        avatar = lemonslice.AvatarSession(
+            agent_image_url=persona["lemonslice_image_url"],
+            agent_prompt=persona.get("lemonslice_agent_prompt", ""),
+        )
+        await health.check_service("avatar", avatar.start(session, room=room))
+
+
 @server.rtc_session(agent_name="my-agent")
 async def my_agent(ctx: JobContext):
     ctx.log_context_fields = {"room": ctx.room.name}
 
+    # Initialize service health monitor
+    health = ServiceHealth()
+    health.register("stt", ServiceTier.CRITICAL)
+    health.register("llm", ServiceTier.CRITICAL)
+    health.register("tts", ServiceTier.CRITICAL)
+    health.register("supabase", ServiceTier.IMPORTANT)
+    health.register("git", ServiceTier.IMPORTANT)
+    health.register("avatar", ServiceTier.OPTIONAL)
+    health.register("summarizer", ServiceTier.OPTIONAL)
+
     # Refresh data repo for latest scrapes
     reader: SnapshotReader = ctx.proc.userdata["reader"]
-    reader.refresh()
+    health.check_service_sync("git", reader.refresh)
 
     # Persona will be loaded after participant connects (to read metadata)
 
     # Set up user store
-    supabase_client = get_supabase_client()
+    supabase_client = health.check_service_sync("supabase", get_supabase_client)
     user_store = UserStore(supabase_client) if supabase_client else None
 
     # Get device ID and persona from participant (set by frontend via token request)
@@ -706,58 +972,19 @@ async def my_agent(ctx: JobContext):
     # Load persona (participant choice overrides config default)
     persona = load_persona(persona_name)
 
-    # Check user profile and build context
-    needs_onboarding = False
-    context_parts = []
+    # Build user and data context
+    needs_onboarding, context_parts, user_name = _build_user_context(
+        health, user_store, device_id, ip_address
+    )
+    context_parts.extend(_build_data_context(reader))
 
-    if user_store and not device_id.startswith("unknown-"):
-        profile = user_store.get_profile(device_id)
-        if profile:
-            # Returning user — add profile and session history to instructions
-            profile_context = user_store.format_profile_context(profile)
-            if profile_context:
-                context_parts.append(f"## Current user\n{profile_context}")
-
-            sessions = user_store.get_recent_sessions(device_id, limit=5)
-            session_context = user_store.format_session_context(sessions)
-            if session_context:
-                context_parts.append(f"## Recent sessions\n{session_context}")
-        else:
-            # New user — flag for onboarding
-            needs_onboarding = True
-            # Create a minimal profile so session_history FK works
-            user_store.save_profile(device_id=device_id, ip_address=ip_address)
-            context_parts.append(
-                "## New user\n"
-                "This user has never spoken to you before. You MUST complete onboarding "
-                "before answering any other questions. Follow the onboarding script in your "
-                "instructions exactly — one question at a time. Do not skip onboarding even "
-                "if the user asks you something else first."
-            )
-
-    # Add class overview
-    class_overview = summarize_all_classes(reader)
-    if class_overview:
-        context_parts.append(f"## Current grades\n{class_overview}")
-
-    # Add available snapshot dates with day-of-week so LLM can resolve relative dates
-    available_dates = reader.list_snapshot_dates()
-    if available_dates:
-        from datetime import date as date_type
-        day_names = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
-        annotated = []
-        for d in available_dates:
-            try:
-                parsed = date_type.fromisoformat(d)
-                annotated.append(f"{d} ({day_names[parsed.weekday()]})")
-            except ValueError:
-                annotated.append(d)
-        dates_str = ", ".join(annotated)
+    # Inject service health warnings into context
+    health_warnings = health.session_warnings()
+    if health_warnings:
         context_parts.append(
-            f"## Available snapshot dates\n"
-            f"Data exists for these dates only: {dates_str}\n"
-            f"Use the day names to resolve relative date references like 'last Friday'. "
-            f"Never claim data is unavailable for a date in this list."
+            "## Service status\n"
+            + "\n".join(health_warnings)
+            + "\nInform the user if they ask about affected features."
         )
 
     # Prepend context to persona instructions (system-level, not conversation history)
@@ -765,22 +992,7 @@ async def my_agent(ctx: JobContext):
     if context_parts:
         instructions = instructions + "\n\n" + "\n\n".join(context_parts)
 
-    # Configure TTS based on provider
-    tts_provider = persona.get("tts_provider", "cartesia")
-    if tts_provider == "elevenlabs" and persona.get("elevenlabs_voice_id"):
-        tts = elevenlabs.TTS(
-            voice_id=persona["elevenlabs_voice_id"],
-            voice_settings=elevenlabs.VoiceSettings(
-                stability=float(persona.get("elevenlabs_stability", 0.5)),
-                similarity_boost=float(persona.get("elevenlabs_similarity", 0.75)),
-                speed=float(persona.get("elevenlabs_speed", 0.85)),
-            ),
-        )
-    else:
-        tts = inference.TTS(
-            model=persona.get("tts_model", "cartesia/sonic-3"),
-            voice=persona.get("tts_voice", "9626c31c-bec5-4cca-baa8-f8ba9e84c8bc"),
-        )
+    tts = _configure_tts(persona)
 
     session_id = str(uuid.uuid4())
     session_data = SessionData(
@@ -799,30 +1011,12 @@ async def my_agent(ctx: JobContext):
             extra_kwargs={"temperature": persona.get("llm_temperature", 0.7)},
         ),
         tts=tts,
-        turn_detection=MultilingualModel(),
+        turn_handling={"turn_detection": MultilingualModel()},
         vad=ctx.proc.userdata["vad"],
         preemptive_generation=True,
     )
 
-    # Start avatar if configured (non-fatal — agent works without it)
-    avatar_provider = persona.get("avatar_provider")
-    try:
-        if avatar_provider == "hedra" and persona.get("hedra_avatar_id"):
-            avatar = hedra.AvatarSession(avatar_id=persona["hedra_avatar_id"])
-            await avatar.start(session, room=ctx.room)
-        elif avatar_provider == "lemonslice" and persona.get("lemonslice_image_url"):
-            from livekit.plugins import lemonslice
-
-            avatar = lemonslice.AvatarSession(
-                agent_image_url=persona["lemonslice_image_url"],
-                agent_prompt=persona.get("lemonslice_agent_prompt", ""),
-            )
-            await avatar.start(session, room=ctx.room)
-    except Exception:
-        logger.exception(
-            "%s avatar failed to start, continuing without avatar",
-            avatar_provider,
-        )
+    await _start_avatar(health, persona, session, ctx.room)
 
     await session.start(
         agent=Assistant(instructions=instructions),
@@ -864,105 +1058,80 @@ async def my_agent(ctx: JobContext):
         await session.say(onboarding_greeting)
     else:
         if greeting:
-            await session.say(greeting)
+            personalized = f"Hey {user_name}! {greeting}" if user_name else greeting
+            await session.say(personalized)
         else:
             await session.generate_reply(
                 instructions="Greet the user using your catchphrase greeting. Stay in character. If you know their name from the context, use it."
             )
 
-    # Save session summary on disconnect
-    async def on_session_end():
+    # Build class keyword map dynamically from snapshot data (not hardcoded)
+    _class_keywords: dict[str, str] = {}
+    index = reader.get_rolling_index()
+    latest = index.latest_snapshot()
+    if latest:
+        for slug, cls in latest.classes.items():
+            _class_keywords[slug] = cls.course
+            for word in cls.course.lower().split():
+                if len(word) > 2 and word not in _class_keywords:
+                    _class_keywords[word] = cls.course
+
+    # Save session summary on disconnect.
+    # Synchronous — no asyncio involvement, safe to call from close event handler.
+    # session.once("close") fires per-session on participant disconnect.
+    # ctx.add_shutdown_callback is a last-resort fallback for process exit.
+    _session_saved = False
+
+    def _save_session_history():
+        nonlocal _session_saved
+        if _session_saved:
+            return
+        _session_saved = True
         if not user_store:
             return
         try:
-            # Try chat context first, fall back to saved messages
-            transcript_parts = []
-            try:
-                chat_ctx = session.chat_ctx
-                for item in chat_ctx.items:
-                    role = getattr(item, "role", None)
-                    content = getattr(item, "content", None)
-                    if role in ("user", "assistant") and content:
-                        text = content[0] if isinstance(content, list) else content
-                        if isinstance(text, str) and text.strip():
-                            transcript_parts.append(f"{role}: {text}")
-            except Exception:
-                pass
-
-            # Fall back to saved messages from Supabase
-            if len(transcript_parts) < 2:
-                saved = user_store.get_session_messages(session_id)
-                transcript_parts = [f"{m['role']}: {m['content']}" for m in saved]
-
-            if len(transcript_parts) < 2:
-                logger.info("Too few messages to summarize for %s", device_id)
+            saved = user_store.get_session_messages(session_id)
+            if not saved:
+                logger.info("No messages for session %s", session_id)
                 return
 
-            transcript = "\n".join(transcript_parts)
+            msg_count = len(saved)
+            user_text = " ".join(
+                m["content"] for m in saved if m.get("role") == "user"
+            ).lower()
 
-            # Summarize via OpenAI SDK directly (avoids LiveKit session lifecycle issues)
-            from openai import AsyncOpenAI
+            seen: set[str] = set()
+            classes_mentioned = []
+            for kw, name in _class_keywords.items():
+                if kw in user_text and name not in seen:
+                    classes_mentioned.append(name)
+                    seen.add(name)
 
-            openai_client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-            completion = await openai_client.chat.completions.create(
-                model="gpt-4.1",
-                messages=[
-                    {
-                        "role": "user",
-                        "content": (
-                            "Summarize this conversation. Respond in exactly this format:\n"
-                            "SUMMARY: (2-3 sentence summary of what was discussed)\n"
-                            "TOPICS: (comma-separated list of topics discussed)\n"
-                            "CLASSES: (comma-separated list of class names mentioned, or 'none')\n\n"
-                            f"{transcript}"
-                        ),
-                    }
-                ],
+            summary = (
+                f"Discussed {', '.join(classes_mentioned)} ({msg_count} messages)."
+                if classes_mentioned
+                else f"Conversation with {msg_count} messages."
             )
-            raw = (completion.choices[0].message.content or "").strip()
-            if not raw:
-                logger.warning("Empty summary generated for %s", device_id)
-                return
-
-            # Parse structured response
-            summary = raw
-            topics = []
-            classes = []
-            for line in raw.split("\n"):
-                line = line.strip()
-                if line.upper().startswith("SUMMARY:"):
-                    summary = line[8:].strip()
-                elif line.upper().startswith("TOPICS:"):
-                    topics = [t.strip() for t in line[7:].split(",") if t.strip()]
-                elif line.upper().startswith("CLASSES:"):
-                    classes = [
-                        c.strip()
-                        for c in line[8:].split(",")
-                        if c.strip() and c.strip().lower() != "none"
-                    ]
-
             user_store.save_session(
                 device_id=device_id,
+                session_id=session_id,
                 summary=summary,
-                topics_discussed=topics or None,
-                classes_mentioned=classes or None,
+                classes_mentioned=classes_mentioned or None,
             )
-            logger.info("Session summary saved for %s", device_id)
+            logger.info("Session saved for %s: %s", device_id, summary)
         except Exception:
-            logger.exception("Failed to save session summary")
+            logger.exception("Failed to save session history")
 
-    _session_ended = False
-    _original_on_session_end = on_session_end
+    def _on_close(_event):
+        _save_session_history()
+        logger.info(health.summary())
 
-    async def on_session_end():
-        nonlocal _session_ended
-        if _session_ended:
-            return
-        _session_ended = True
-        await _original_on_session_end()
+    session.once("close", _on_close)
 
-    session.once("close", lambda _: asyncio.create_task(on_session_end()))
-    ctx.add_shutdown_callback(on_session_end)
+    async def _shutdown_fallback():
+        _save_session_history()
+
+    ctx.add_shutdown_callback(_shutdown_fallback)
 
 
 if __name__ == "__main__":

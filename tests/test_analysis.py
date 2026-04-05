@@ -19,6 +19,7 @@ from data.analysis import (
     get_deleted_assignments,
     get_grade_trend,
     get_modified_assignments,
+    get_ungraded_assignments,
     list_flagged_assignments,
     summarize_all_classes,
     summarize_changes,
@@ -658,6 +659,27 @@ class TestAnalysis:
     def test_modified_assignments_class_filter(self, reader):
         result = get_modified_assignments(reader, slug="english_10_honors", days=365)
         assert "No retroactive" in result
+
+    def test_get_ungraded_finds_unscored(self, reader):
+        """IXL M7Q (score_raw '--/20') should appear as ungraded."""
+        result = get_ungraded_assignments(reader, slug="geometry")
+        assert "IXL M7Q" in result
+
+    def test_get_ungraded_excludes_scored(self, reader):
+        """Scored assignments should not appear."""
+        result = get_ungraded_assignments(reader, slug="geometry")
+        assert "Circumcenter Quiz" not in result
+        assert "Medians and Altitudes" not in result
+
+    def test_get_ungraded_all_classes(self, reader):
+        """Without slug filter, searches all classes."""
+        result = get_ungraded_assignments(reader)
+        assert "IXL M7Q" in result
+
+    def test_get_ungraded_none_found(self, reader):
+        """Class with no assignment files returns no-ungraded message."""
+        result = get_ungraded_assignments(reader, slug="english_10_honors")
+        assert "No ungraded" in result
 
 
 # --- _is_unscored tests ---

@@ -452,6 +452,46 @@ def get_deleted_assignments(
     return "\n".join(all_deleted)
 
 
+def get_ungraded_assignments(
+    reader: SnapshotReader,
+    slug: str | None = None,
+) -> str:
+    """Find assignments in the latest snapshot that have no score entered yet.
+
+    Sorted by point value descending so the highest-stakes ungraded work appears first.
+    """
+    coords = reader.latest_snapshot_coords()
+    if not coords:
+        return "No snapshot data available."
+    date, time = coords
+
+    index = reader.get_rolling_index()
+    latest = index.latest_snapshot()
+    if not latest:
+        return "No snapshot data available."
+
+    slugs = [slug] if slug else list(latest.classes.keys())
+    items: list[tuple[float, str]] = []
+
+    for s in slugs:
+        assignments = reader.read_assignments(date, time, s)
+        course = latest.classes.get(s)
+        label = course.course if course else s
+        for a in assignments:
+            if _is_unscored(a.score_raw):
+                pts = a.points_possible or 0.0
+                pts_str = f"{int(pts)} pts" if pts else "unweighted"
+                items.append((pts, f"{label}: {a.name} (due {a.due_date}, {pts_str})"))
+
+    if not items:
+        scope = f" in '{slug}'" if slug else ""
+        return f"No ungraded assignments found{scope}."
+
+    items.sort(reverse=True)
+    lines = [item[1] for item in items[:20]]
+    return "\n".join(lines)
+
+
 def _is_unscored(value) -> bool:
     """Check if a score value represents an unscored/pending state."""
     if value is None:

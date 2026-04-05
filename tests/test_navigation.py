@@ -133,6 +133,7 @@ class TestToolNavigationAlignment:
             "get_deleted_assignments_list",
             "get_score_changes",
             "save_user_profile",
+            "get_ungraded_assignments",
         ]
         for tool_name in non_navigating:
             method = getattr(Assistant, tool_name, None)
@@ -237,3 +238,113 @@ class TestParseTimestamp:
 
         dt = _parse_timestamp("2026-03-10T15:30:41")
         assert dt.second == 41
+
+
+# --- Date resolution arithmetic ---
+
+
+class TestResolveDateArithmetic:
+    """Unit tests for resolve_relative_date (pure date math, no LiveKit)."""
+
+    def test_last_friday_from_saturday(self):
+        from datetime import date
+
+        from agent import resolve_relative_date
+
+        result = resolve_relative_date("last Friday", today=date(2026, 4, 4))
+        assert result == date(2026, 4, 3)
+
+    def test_last_friday_from_friday(self):
+        """'last Friday' on a Friday means the previous week."""
+        from datetime import date
+
+        from agent import resolve_relative_date
+
+        result = resolve_relative_date("last Friday", today=date(2026, 4, 3))
+        assert result == date(2026, 3, 27)
+
+    def test_before_with_iso_date(self):
+        """'the Friday before 2026-04-03' -> March 27."""
+        from datetime import date
+
+        from agent import resolve_relative_date
+
+        result = resolve_relative_date(
+            "the Friday before 2026-04-03", today=date(2026, 4, 4)
+        )
+        assert result == date(2026, 3, 27)
+
+    def test_before_without_iso_date(self):
+        """'the Friday before' from Saturday Apr 4 -> Mar 27."""
+        from datetime import date
+
+        from agent import resolve_relative_date
+
+        result = resolve_relative_date("the Friday before", today=date(2026, 4, 4))
+        assert result == date(2026, 3, 27)
+
+    def test_yesterday(self):
+        from datetime import date
+
+        from agent import resolve_relative_date
+
+        result = resolve_relative_date("yesterday", today=date(2026, 4, 4))
+        assert result == date(2026, 4, 3)
+
+    def test_today(self):
+        from datetime import date
+
+        from agent import resolve_relative_date
+
+        result = resolve_relative_date("today", today=date(2026, 4, 4))
+        assert result == date(2026, 4, 4)
+
+    def test_last_monday(self):
+        from datetime import date
+
+        from agent import resolve_relative_date
+
+        # Friday Apr 4 -> previous Monday is Mar 30
+        result = resolve_relative_date("last Monday", today=date(2026, 4, 4))
+        assert result == date(2026, 3, 30)
+
+    def test_unresolvable_returns_none(self):
+        from datetime import date
+
+        from agent import resolve_relative_date
+
+        result = resolve_relative_date("sometime in the past", today=date(2026, 4, 4))
+        assert result is None
+
+
+# --- Placeholder summary detection ---
+
+
+class TestIsPlaceholderSummary:
+    def test_discussed_classes_pattern(self):
+        from agent import _is_placeholder_summary
+
+        assert (
+            _is_placeholder_summary("Discussed Geometry, English 10 (8 messages).")
+            is True
+        )
+
+    def test_conversation_pattern(self):
+        from agent import _is_placeholder_summary
+
+        assert _is_placeholder_summary("Conversation with 12 messages.") is True
+
+    def test_llm_generated_summary(self):
+        from agent import _is_placeholder_summary
+
+        assert (
+            _is_placeholder_summary(
+                "The user asked about their Geometry grade trend and missing assignments."
+            )
+            is False
+        )
+
+    def test_empty_string(self):
+        from agent import _is_placeholder_summary
+
+        assert _is_placeholder_summary("") is False

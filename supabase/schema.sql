@@ -17,6 +17,7 @@ create table if not exists user_profiles (
 create table if not exists session_history (
   id uuid default gen_random_uuid() primary key,
   device_id text not null references user_profiles(device_id) on delete cascade,
+  session_id text unique,
   session_date timestamptz default now(),
   summary text not null,
   topics_discussed text[],

@@ -44,7 +44,6 @@ class UserStore:
         name: str | None = None,
         relation_to_student: str | None = None,
         priorities: list[str] | None = None,
-        communication_preferences: str | None = None,
         ip_address: str | None = None,
     ) -> dict:
         """Create or update a user profile."""
@@ -55,8 +54,6 @@ class UserStore:
             data["relation_to_student"] = relation_to_student
         if priorities is not None:
             data["priorities"] = priorities
-        if communication_preferences is not None:
-            data["communication_preferences"] = communication_preferences
         if ip_address is not None:
             data["ip_address"] = ip_address
 
@@ -83,6 +80,7 @@ class UserStore:
         self,
         device_id: str,
         summary: str,
+        session_id: str | None = None,
         topics_discussed: list[str] | None = None,
         classes_mentioned: list[str] | None = None,
     ) -> None:
@@ -91,12 +89,20 @@ class UserStore:
             "device_id": device_id,
             "summary": summary,
         }
+        if session_id:
+            data["session_id"] = session_id
         if topics_discussed:
             data["topics_discussed"] = topics_discussed
         if classes_mentioned:
             data["classes_mentioned"] = classes_mentioned
 
         self.client.table("session_history").insert(data).execute()
+
+    def update_session_summary(self, session_id: str, summary: str) -> None:
+        """Upgrade a placeholder summary with an LLM-generated one."""
+        self.client.table("session_history").update({"summary": summary}).eq(
+            "session_id", session_id
+        ).execute()
 
     def save_message(
         self,
@@ -133,8 +139,6 @@ class UserStore:
             parts.append(f"The user's name is {profile['name']}.")
         if profile.get("relation_to_student"):
             parts.append(f"They are the student's {profile['relation_to_student']}.")
-        if profile.get("communication_preferences"):
-            parts.append(f"They prefer {profile['communication_preferences']} answers.")
         if profile.get("priorities"):
             parts.append(f"They care most about: {', '.join(profile['priorities'])}.")
         return " ".join(parts)
