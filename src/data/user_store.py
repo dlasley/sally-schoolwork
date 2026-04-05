@@ -45,6 +45,7 @@ class UserStore:
         relation_to_student: str | None = None,
         priorities: list[str] | None = None,
         communication_preferences: str | None = None,
+        ip_address: str | None = None,
     ) -> dict:
         """Create or update a user profile."""
         data: dict = {"device_id": device_id}
@@ -56,6 +57,8 @@ class UserStore:
             data["priorities"] = priorities
         if communication_preferences is not None:
             data["communication_preferences"] = communication_preferences
+        if ip_address is not None:
+            data["ip_address"] = ip_address
 
         result = (
             self.client.table("user_profiles")

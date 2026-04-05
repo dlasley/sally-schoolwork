@@ -1,3 +1,4 @@
+import asyncio
 import json
 import logging
 import os
@@ -634,9 +635,11 @@ async def my_agent(ctx: JobContext):
         device_id = participant.identity
         metadata = json.loads(participant.metadata) if participant.metadata else {}
         persona_name = metadata.get("persona") or None
+        ip_address = participant.attributes.get("ip_address")
     except Exception:
         device_id = f"unknown-{ctx.room.name}"
         persona_name = None
+        ip_address = None
         logger.warning("Could not get participant identity, using %s", device_id)
 
     # Load persona (participant choice overrides config default)
@@ -662,12 +665,22 @@ async def my_agent(ctx: JobContext):
             # New user — flag for onboarding
             needs_onboarding = True
             # Create a minimal profile so session_history FK works
-            user_store.save_profile(device_id=device_id)
+            user_store.save_profile(device_id=device_id, ip_address=ip_address)
 
     # Add class overview
     class_overview = summarize_all_classes(reader)
     if class_overview:
         context_parts.append(f"## Current grades\n{class_overview}")
+
+    # Add available snapshot dates so the LLM knows what data exists
+    available_dates = reader.list_snapshot_dates()
+    if available_dates:
+        dates_str = ", ".join(available_dates)
+        context_parts.append(
+            f"## Available snapshot dates\n"
+            f"Data exists for these dates only: {dates_str}\n"
+            f"Never claim data is unavailable for a date in this list."
+        )
 
     # Prepend context to persona instructions (system-level, not conversation history)
     instructions = persona["instructions"]
@@ -866,7 +879,7 @@ async def my_agent(ctx: JobContext):
         except Exception:
             logger.exception("Failed to save session summary")
 
-    ctx.add_shutdown_callback(on_session_end)
+    session.once("close", lambda _: asyncio.ensure_future(on_session_end()))
 
 
 if __name__ == "__main__":

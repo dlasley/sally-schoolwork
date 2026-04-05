@@ -8,6 +8,7 @@ create table if not exists user_profiles (
   relation_to_student text,
   priorities text[],
   communication_preferences text,
+  ip_address text,
   created_at timestamptz default now(),
   updated_at timestamptz default now()
 );
