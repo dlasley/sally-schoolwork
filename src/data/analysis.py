@@ -89,9 +89,17 @@ def diff_assignments(
     return changes
 
 
-def summarize_class(reader: SnapshotReader, slug: str) -> str:
-    """Summarize current state of a class: grade, assignment count, teacher."""
-    coords = reader.latest_snapshot_coords()
+def summarize_class(
+    reader: SnapshotReader,
+    slug: str,
+    date: str | None = None,
+) -> str:
+    """Summarize a class: grade, assignment count, teacher. Uses latest snapshot unless date given."""
+    if date:
+        times = reader.list_snapshot_times(date)
+        coords: tuple[str, str] | None = (date, times[-1]) if times else None
+    else:
+        coords = reader.latest_snapshot_coords()
     if not coords:
         return "No snapshot data available."
 

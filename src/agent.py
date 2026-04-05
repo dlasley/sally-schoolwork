@@ -226,22 +226,31 @@ class Assistant(Agent):
         self,
         context: RunContext[SessionData],
         class_name: str,
+        date: str = "",
     ):
         """Get a summary of a specific class including current grade, assignment count, and teacher.
 
         Use this tool when the user asks about a specific class grade or class details.
+        For historical queries ("last Friday", "on March 15th"), pass the resolved date.
 
         Args:
             class_name: The name of the class to look up. Can be a partial name like "geo" for Geometry.
+            date: Optional date in YYYY-MM-DD format. Defaults to the latest snapshot.
         """
         reader = context.userdata.reader
         slug = reader.resolve_slug(class_name)
         if not slug:
             return f"Could not find a class matching '{class_name}'. Ask the user to clarify."
-        coords = reader.latest_snapshot_coords()
-        if coords:
-            await self._navigate_browser(date=coords[0], slug=slug)
-        return summarize_class(reader, slug)
+        available = reader.list_snapshot_dates()
+        resolved_date = date if (date and date in available) else None
+        if resolved_date:
+            times = reader.list_snapshot_times(resolved_date)
+            nav_date = resolved_date
+        else:
+            coords = reader.latest_snapshot_coords()
+            nav_date = coords[0] if coords else ""
+        await self._navigate_browser(date=nav_date, slug=slug)
+        return summarize_class(reader, slug, date=resolved_date)
 
     @function_tool()
     async def get_recent_changes(
@@ -666,6 +675,13 @@ async def my_agent(ctx: JobContext):
             needs_onboarding = True
             # Create a minimal profile so session_history FK works
             user_store.save_profile(device_id=device_id, ip_address=ip_address)
+            context_parts.append(
+                "## New user\n"
+                "This user has never spoken to you before. You MUST complete onboarding "
+                "before answering any other questions. Follow the onboarding script in your "
+                "instructions exactly — one question at a time. Do not skip onboarding even "
+                "if the user asks you something else first."
+            )
 
     # Add class overview
     class_overview = summarize_all_classes(reader)
