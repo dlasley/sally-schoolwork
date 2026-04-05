@@ -844,8 +844,9 @@ async def my_agent(ctx: JobContext):
                 ),
             )
 
+            summary_llm = inference.LLM(model="openai/gpt-4.1")
             response_parts = []
-            llm_stream = session.llm.chat(chat_ctx=summary_ctx)
+            llm_stream = summary_llm.chat(chat_ctx=summary_ctx)
             async for chunk in llm_stream:
                 text = None
                 if hasattr(chunk, "choices") and chunk.choices:
