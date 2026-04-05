@@ -649,7 +649,7 @@ async def my_agent(ctx: JobContext):
     needs_onboarding = False
     context_parts = []
 
-    if user_store:
+    if user_store and not device_id.startswith("unknown-"):
         profile = user_store.get_profile(device_id)
         if profile:
             # Returning user — add profile and session history to instructions
@@ -879,7 +879,7 @@ async def my_agent(ctx: JobContext):
         except Exception:
             logger.exception("Failed to save session summary")
 
-    session.once("close", lambda _: asyncio.ensure_future(on_session_end()))
+    session.once("close", lambda _: asyncio.create_task(on_session_end()))
 
 
 if __name__ == "__main__":
