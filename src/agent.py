@@ -621,21 +621,26 @@ async def my_agent(ctx: JobContext):
     reader: SnapshotReader = ctx.proc.userdata["reader"]
     reader.refresh()
 
-    # Load persona
-    persona = load_persona()
+    # Persona will be loaded after participant connects (to read metadata)
 
     # Set up user store
     supabase_client = get_supabase_client()
     user_store = UserStore(supabase_client) if supabase_client else None
 
-    # Get device ID from participant identity (set by frontend via token request)
+    # Get device ID and persona from participant (set by frontend via token request)
     await ctx.connect()
     try:
         participant = await ctx.wait_for_participant()
         device_id = participant.identity
+        metadata = json.loads(participant.metadata) if participant.metadata else {}
+        persona_name = metadata.get("persona") or None
     except Exception:
         device_id = f"unknown-{ctx.room.name}"
+        persona_name = None
         logger.warning("Could not get participant identity, using %s", device_id)
+
+    # Load persona (participant choice overrides config default)
+    persona = load_persona(persona_name)
 
     # Check user profile and build context
     needs_onboarding = False

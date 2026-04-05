@@ -3,29 +3,23 @@
   "personas": {
     "avatar1": {
       "instructions": "personas/avatar1/persona.md",
-      "greeting": "Hey hey! I'm Sally Schoolwork! What do you want to know?",
+      "greeting": "Hey hey! I'm Sally Schoolwork! Say 'show me what you can do' to see what I can help with. What do you want to know?",
       "avatar_provider": "hedra",
       "tts_provider": "elevenlabs",
-      "tts_model": "cartesia/sonic-3",
-      "tts_voice": "9626c31c-bec5-4cca-baa8-f8ba9e84c8bc",
       "llm_temperature": 0.4
     },
     "avatar2": {
       "instructions": "personas/avatar2/persona.md",
-      "greeting": "Hello! I'm Sally Schoolwork! What do you want to know?",
+      "greeting": "Hello! I'm Sally Schoolwork! Say 'show me what you can do' to see what I can help with. What do you want to know?",
       "avatar_provider": "lemonslice",
       "tts_provider": "elevenlabs",
-      "tts_model": "cartesia/sonic-3",
-      "tts_voice": "9626c31c-bec5-4cca-baa8-f8ba9e84c8bc",
       "llm_temperature": 0.5
     },
     "avatar3": {
       "instructions": "personas/avatar3/persona.md",
-      "greeting": "Hey there! Sally Schoolwork here. What are we looking at today?",
+      "greeting": "Hey there! Sally Schoolwork here. Say 'show me what you can do' to see what I can help with. What are we looking at today?",
       "avatar_provider": "lemonslice",
       "tts_provider": "elevenlabs",
-      "tts_model": "cartesia/sonic-3",
-      "tts_voice": "9626c31c-bec5-4cca-baa8-f8ba9e84c8bc",
       "llm_temperature": 0.4
     }
   },
