@@ -486,17 +486,11 @@ class Assistant(Agent):
         """
         await self._navigate_browser(date="", slug="help")
         return (
-            "I can help with:\n"
-            "- Current grades and class summaries\n"
-            "- Individual assignment scores and details\n"
-            "- Recent changes — what's been added, modified, or deleted\n"
-            "- Score change history — which assignments had grades updated\n"
-            "- Missing, late, or flagged assignments\n"
-            "- Grade trends over time\n"
-            "- Category breakdowns (quizzes vs homework, etc.)\n"
-            "- Overall summaries and patterns across all classes\n"
-            "- Comparing assignments between two dates\n"
-            "Just ask me anything about grades or assignments!"
+            "Narrate this naturally in one or two spoken sentences — no lists or bullets: "
+            "You can look up current grades and class summaries, individual assignment scores, "
+            "recent changes like new or modified assignments, grade trends over time, "
+            "missing or late work, and comparisons between two dates. "
+            "The help page is now open in the browser for more examples."
         )
 
     @function_tool()
