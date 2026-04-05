@@ -163,6 +163,8 @@ result = health.check_service_sync("some_api", some_api.call)
 
 **5. Log the service health summary.** The `health.summary()` is logged at session close. If adding a new lifecycle event that should report health (e.g., a mid-session checkpoint), call `health.summary()` there too.
 
+**6. Update tests and health checks when modifying existing code.** When changing a function that has tests, update those tests to cover the new behavior. When changing a service call that is wrapped with `ServiceHealth`, verify the health registration and tier are still correct. When removing a service dependency, remove its health registration. When changing a tool method, verify the navigation alignment tests in `test_navigation.py::TestToolNavigationAlignment` still reflect the correct navigating/non-navigating classification. Run the full non-LLM test suite (`uv run pytest tests/test_analysis.py tests/test_navigation.py tests/test_user_store.py tests/test_service_health.py`) after every code change — never defer test runs to the end of a session.
+
 ## LiveKit CLI
 
 Beyond documentation access, the LiveKit CLI (`lk`) supports other tasks such as managing SIP trunks for telephony-based agents. Run `lk --help` to explore available commands.
