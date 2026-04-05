@@ -3,6 +3,7 @@
   "personas": {
     "avatar1": {
       "instructions": "personas/avatar1/persona.md",
+      "greeting": "Hey hey! I'm Sally Schoolwork! What do you want to know?",
       "avatar_provider": "hedra",
       "tts_provider": "elevenlabs",
       "tts_model": "cartesia/sonic-3",
@@ -11,6 +12,7 @@
     },
     "avatar2": {
       "instructions": "personas/avatar2/persona.md",
+      "greeting": "Hello! I'm Sally Schoolwork! What do you want to know?",
       "avatar_provider": "lemonslice",
       "tts_provider": "elevenlabs",
       "tts_model": "cartesia/sonic-3",
@@ -19,6 +21,7 @@
     },
     "avatar3": {
       "instructions": "personas/avatar3/persona.md",
+      "greeting": "Hey there! Sally Schoolwork here. What are we looking at today?",
       "avatar_provider": "lemonslice",
       "tts_provider": "elevenlabs",
       "tts_model": "cartesia/sonic-3",

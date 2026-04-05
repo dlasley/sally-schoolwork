@@ -758,14 +758,20 @@ async def my_agent(ctx: JobContext):
                 logger.exception("Failed to save conversation item")
 
     # Greet or onboard
+    greeting = persona.get("greeting")
     if needs_onboarding:
+        if greeting:
+            await session.say(greeting)
         await session.generate_reply(
-            instructions="This is a new user you haven't met before. Say your name is Sally Schoolwork. Mention you have a few quick questions to get to know them. Then ask ONLY their name — nothing else yet."
+            instructions="The user is new. Mention you have a few quick questions to get to know them. Then ask ONLY their name — nothing else yet."
         )
     else:
-        await session.generate_reply(
-            instructions="Greet the user using your catchphrase greeting. Stay in character. If you know their name from the context, use it."
-        )
+        if greeting:
+            await session.say(greeting)
+        else:
+            await session.generate_reply(
+                instructions="Greet the user using your catchphrase greeting. Stay in character. If you know their name from the context, use it."
+            )
 
     # Save session summary on disconnect
     async def on_session_end():
