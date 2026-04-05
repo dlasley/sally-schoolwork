@@ -152,7 +152,9 @@ class Assistant(Agent):
     def __init__(self, instructions: str) -> None:
         super().__init__(instructions=instructions)
 
-    async def _navigate_browser(self, date: str = "", slug: str = "") -> None:
+    async def _navigate_browser(
+        self, date: str = "", slug: str = "", compare_date: str = ""
+    ) -> None:
         """Navigate the user's browser as a side effect. Non-blocking, fire-and-forget."""
         try:
             from livekit.agents import get_job_context
@@ -166,9 +168,13 @@ class Assistant(Agent):
             if not target:
                 return
 
-            payload = json.dumps(
-                {"view": "day" if date else "calendar", "date": date, "className": slug}
-            )
+            payload_dict: dict = {"view": "day" if date else "calendar", "date": date, "className": slug}
+            if compare_date:
+                reader = get_job_context().proc.userdata["reader"]
+                times = reader.list_snapshot_times(compare_date)
+                if times:
+                    payload_dict["compareDate"] = f"{compare_date}/{times[-1]}"
+            payload = json.dumps(payload_dict)
             await room.local_participant.perform_rpc(
                 destination_identity=target,
                 method="navigateTo",
@@ -331,7 +337,7 @@ class Assistant(Agent):
         if not times2:
             return f"No snapshot data found for {date2}."
 
-        await self._navigate_browser(date=date2, slug=slug)
+        await self._navigate_browser(date=date2, slug=slug, compare_date=date1)
         return diff_snapshots(reader, slug, date1, times1[-1], date2, times2[-1])
 
     @function_tool()
@@ -682,13 +688,23 @@ async def my_agent(ctx: JobContext):
     if class_overview:
         context_parts.append(f"## Current grades\n{class_overview}")
 
-    # Add available snapshot dates so the LLM knows what data exists
+    # Add available snapshot dates with day-of-week so LLM can resolve relative dates
     available_dates = reader.list_snapshot_dates()
     if available_dates:
-        dates_str = ", ".join(available_dates)
+        from datetime import date as date_type
+        day_names = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+        annotated = []
+        for d in available_dates:
+            try:
+                parsed = date_type.fromisoformat(d)
+                annotated.append(f"{d} ({day_names[parsed.weekday()]})")
+            except ValueError:
+                annotated.append(d)
+        dates_str = ", ".join(annotated)
         context_parts.append(
             f"## Available snapshot dates\n"
             f"Data exists for these dates only: {dates_str}\n"
+            f"Use the day names to resolve relative date references like 'last Friday'. "
             f"Never claim data is unavailable for a date in this list."
         )
 
@@ -890,7 +906,18 @@ async def my_agent(ctx: JobContext):
         except Exception:
             logger.exception("Failed to save session summary")
 
+    _session_ended = False
+    _original_on_session_end = on_session_end
+
+    async def on_session_end():
+        nonlocal _session_ended
+        if _session_ended:
+            return
+        _session_ended = True
+        await _original_on_session_end()
+
     session.once("close", lambda _: asyncio.create_task(on_session_end()))
+    ctx.add_shutdown_callback(on_session_end)
 
 
 if __name__ == "__main__":
