@@ -13,7 +13,6 @@ from livekit.agents import (
     Agent,
     AgentServer,
     AgentSession,
-    ChatContext,
     JobContext,
     JobProcess,
     RunContext,
@@ -183,6 +182,59 @@ class Assistant(Agent):
             )
         except Exception:
             logger.debug("Navigation RPC failed", exc_info=True)
+
+    @function_tool()
+    async def resolve_date(
+        self,
+        context: RunContext[SessionData],
+        description: str,
+    ):
+        """Resolve a relative date description to an exact YYYY-MM-DD date.
+
+        ALWAYS call this tool before passing a date to any other tool.
+        Use it for any relative reference: 'last Friday', 'yesterday',
+        'two weeks ago', 'March 15th', etc.
+
+        Args:
+            description: Natural language date description, e.g. 'last Friday'.
+        """
+        from datetime import date, timedelta
+
+        today = date.today()
+        desc = description.lower().strip()
+        day_map = {
+            "monday": 0, "tuesday": 1, "wednesday": 2, "thursday": 3,
+            "friday": 4, "saturday": 5, "sunday": 6,
+        }
+
+        resolved: date | None = None
+
+        if desc in ("today",):
+            resolved = today
+        elif desc in ("yesterday",):
+            resolved = today - timedelta(days=1)
+        else:
+            for day_name, weekday in day_map.items():
+                if day_name in desc:
+                    days_back = (today.weekday() - weekday) % 7
+                    if days_back == 0:
+                        days_back = 7  # "last X" when today is X means previous week
+                    resolved = today - timedelta(days=days_back)
+                    break
+
+        reader = context.userdata.reader
+        available = reader.list_snapshot_dates()
+
+        if resolved:
+            resolved_str = resolved.isoformat()
+            in_data = resolved_str in available
+            return (
+                f"Resolved '{description}' to {resolved_str}. "
+                f"{'Data exists for this date.' if in_data else 'No snapshot for this date — nearest available: ' + (next((d for d in reversed(available) if d <= resolved_str), available[-1] if available else 'none'))}"
+            )
+
+        # Fallback: return available dates so LLM can pick
+        return f"Could not resolve '{description}'. Available dates: {', '.join(available)}"
 
     @function_tool()
     async def list_classes(
@@ -804,11 +856,12 @@ async def my_agent(ctx: JobContext):
     # Greet or onboard
     greeting = persona.get("greeting")
     if needs_onboarding:
-        if greeting:
-            await session.say(greeting)
-        await session.generate_reply(
-            instructions="The user is new. Mention you have a few quick questions to get to know them. Then ask ONLY their name — nothing else yet."
+        onboarding_greeting = (
+            f"{greeting} Before we get started, what's your name?"
+            if greeting
+            else "Hey hey! I'm Sally Schoolwork! Before we get started, what's your name?"
         )
+        await session.say(onboarding_greeting)
     else:
         if greeting:
             await session.say(greeting)
@@ -847,34 +900,26 @@ async def my_agent(ctx: JobContext):
 
             transcript = "\n".join(transcript_parts)
 
-            # Summarize via LLM — ask for structured output
-            summary_ctx = ChatContext()
-            summary_ctx.add_message(
-                role="user",
-                content=(
-                    "Summarize this conversation. Respond in exactly this format:\n"
-                    "SUMMARY: (2-3 sentence summary of what was discussed)\n"
-                    "TOPICS: (comma-separated list of topics discussed)\n"
-                    "CLASSES: (comma-separated list of class names mentioned, or 'none')\n\n"
-                    f"{transcript}"
-                ),
+            # Summarize via OpenAI SDK directly (avoids LiveKit session lifecycle issues)
+            from openai import AsyncOpenAI
+
+            openai_client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+            completion = await openai_client.chat.completions.create(
+                model="gpt-4.1",
+                messages=[
+                    {
+                        "role": "user",
+                        "content": (
+                            "Summarize this conversation. Respond in exactly this format:\n"
+                            "SUMMARY: (2-3 sentence summary of what was discussed)\n"
+                            "TOPICS: (comma-separated list of topics discussed)\n"
+                            "CLASSES: (comma-separated list of class names mentioned, or 'none')\n\n"
+                            f"{transcript}"
+                        ),
+                    }
+                ],
             )
-
-            summary_llm = inference.LLM(model="openai/gpt-4.1")
-            response_parts = []
-            llm_stream = summary_llm.chat(chat_ctx=summary_ctx)
-            async for chunk in llm_stream:
-                text = None
-                if hasattr(chunk, "choices") and chunk.choices:
-                    delta = chunk.choices[0].delta
-                    text = getattr(delta, "content", None)
-                elif hasattr(chunk, "content"):
-                    text = chunk.content
-                if text:
-                    response_parts.append(text)
-            await llm_stream.aclose()
-
-            raw = "".join(response_parts).strip()
+            raw = (completion.choices[0].message.content or "").strip()
             if not raw:
                 logger.warning("Empty summary generated for %s", device_id)
                 return
