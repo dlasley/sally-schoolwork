@@ -189,14 +189,14 @@ Fixes added to base.md. Will be tested alongside future deterministic changes.
 
 ### Open — architectural debt (identified 2026-04-05 review)
 - **`SnapshotReader.refresh()` swallows exceptions**: `refresh()` catches errors internally without re-raising, so `ServiceHealth` marks git as healthy on failed pulls. Needs fix.
-- **Deferred summarization uses separate OpenAI client**: `_upgrade_session_summary` calls `AsyncOpenAI` directly instead of going through LiveKit inference gateway. Two auth paths, two billing channels. Document for later consolidation.
+- ~~**Deferred summarization uses separate OpenAI client**~~: RESOLVED. Switched to `AsyncAnthropic` (Claude Haiku 4.5) in `deferred_summary.py`. Now uses same provider (Anthropic) as the main agent LLM.
 - **Synchronous close handler is fragile**: Blocking HTTP call in close event may not complete if Supabase is slow. Document for later hardening.
 - **RPC navigation failure invisible to LLM**: `_navigate_browser` is fire-and-forget. If frontend disconnects, agent continues referencing browser. Assess LOE for RPC failure awareness.
 - **Data freshness not checked**: No warning when latest snapshot is stale (>36 hours). Low priority given daily scrapes.
 - **Token endpoint has no rate limiting or auth**: `/api/livekit-token` on Vercel gives anyone a room token. Needs origin check/rate limit.
 - **No Supabase RLS policies**: Service key used for all operations. Needs RLS policies added.
-- **`agent.py` is a 1,138-line monolith**: Needs decomposition — persona loading, deferred summarization, date resolution, tool boilerplate extraction.
-- **Tool method boilerplate**: 17 tools repeat slug-resolve-navigate-analyze pattern (~255 lines). Needs extraction to decorator or base method.
+- ~~**`agent.py` is a 1,138-line monolith**~~: RESOLVED. Decomposed into 6 modules (agent.py now 244 lines).
+- ~~**Tool method boilerplate**~~: RESOLVED. Added `_resolve_class()` helper to Assistant class.
 - **RPC protocol undocumented**: `navigateTo` payload contract between agent and frontend is implicit. Needs documentation and contract test.
 - **Snapshot JSON schema undocumented**: Assignment/metadata schema between scraper and agent is implicit. Needs schema doc and contract test.
 
@@ -214,7 +214,12 @@ Fixes added to base.md. Will be tested alongside future deterministic changes.
 
 ```
 sally-schoolwork (this repo) — Agent backend
-  src/agent.py             — 17 tools, persona loading, session lifecycle, navigation
+  src/agent.py             — Slim orchestrator (244 lines): server, prewarm, session lifecycle
+  src/assistant.py         — 17 tools, _navigate_browser, _resolve_class, SessionData
+  src/session_lifecycle.py — Context builders, TTS, avatar, greeting, close handler
+  src/persona.py           — Persona config loading and templating
+  src/deferred_summary.py  — Background LLM session summarization (Claude Haiku)
+  src/date_resolution.py   — Pure date math (resolve_relative_date)
   src/data/analysis.py     — Deterministic analysis (tools call these, LLM narrates)
   src/data/snapshot_reader.py — Local filesystem reader for table-mutation-data clone
   src/data/user_store.py   — Supabase client for profiles and session memory
@@ -227,7 +232,7 @@ sally-schoolwork (this repo) — Agent backend
   supabase/schema.sql      — Consolidated database schema
   tests/                   — 132 non-LLM tests + 11 LLM-dependent agent tests
 
-table-mutation-tracker (branch feature/livekit-agent-widget)
+table-mutation-tracker (main branch)
   frontend/components/AgentWidget.tsx  — Widget, RPC navigation, device_id
   frontend/app/api/livekit-token/      — Server-side JWT token generation
   frontend/app/day/[date]/DayDetail.tsx — ?class= param, useEffect for tab switching
@@ -241,7 +246,7 @@ External services:
 ## Next Steps
 
 ### High priority
-1. **Refactor `agent.py` monolith** — decompose into modules: persona loading, deferred summarization, date resolution, tool base class/decorator for boilerplate extraction.
+1. ~~**Refactor `agent.py` monolith**~~ — DONE. Decomposed into 6 modules: agent.py (244 lines), assistant.py, session_lifecycle.py, persona.py, deferred_summary.py, date_resolution.py. Added `_resolve_class` helper.
 2. **Scrub PII from table-mutation-tracker CLAUDE.md** — real names and school name still present.
 3. **Clean retest of behavior fixes** — onboarding, guardrails, bullets, ungraded tool, date resolution. All code fixes are in place. Follow live testing protocol.
 

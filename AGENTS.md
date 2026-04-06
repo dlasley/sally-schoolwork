@@ -15,11 +15,16 @@ This Python project uses the `uv` package manager. Always use `uv` to install de
 - **Avatar and voice are optional.** If avatar/voice IDs are null in `config.local.json`, the agent falls back to Cartesia TTS and no avatar.
 - **User profiles.** Stored in Supabase. New users go through a persona-specific onboarding flow. Returning users get profile and session history injected into instructions.
 - **Service health monitoring.** All remote service calls (Supabase, git, avatar, summarizer) are wrapped with `ServiceHealth` for tier-based degradation. Critical failures block session start. Degraded service warnings are injected into the LLM's context.
-- **Session init is decomposed.** `my_agent()` orchestrates four extracted helpers: `_build_user_context()`, `_build_data_context()`, `_configure_tts()`, `_start_avatar()`.
+- **Modular decomposition.** `agent.py` is a slim orchestrator (244 lines). Business logic lives in `assistant.py` (tools), `session_lifecycle.py` (setup/teardown), `persona.py` (config), `deferred_summary.py` (background LLM), `date_resolution.py` (date math).
 
 ### Key files
 
-- `src/agent.py` — Entrypoint. Persona loading, 17 `@function_tool` methods, `resolve_relative_date()` standalone date math, `_navigate_browser` RPC helper, `SessionData` with `SnapshotReader` + `UserStore`, prewarm (clones data repo), session init (git pull, profile check, onboarding, avatar, TTS), session end summary callback. All remote calls wrapped with `ServiceHealth`.
+- `src/agent.py` — Slim entrypoint (244 lines). Server setup, prewarm, `my_agent()` session orchestrator. No business logic.
+- `src/assistant.py` — `Assistant` class with 17 `@function_tool` methods, `_navigate_browser` RPC helper, `_resolve_class` helper, `SessionData` dataclass.
+- `src/session_lifecycle.py` — Session setup/teardown: `build_user_context`, `build_data_context`, `configure_tts`, `start_avatar`, `deliver_greeting`, `save_session_history`, `validate_api_keys`, `build_class_keywords`.
+- `src/persona.py` — `load_persona()` config merge and templating. No LiveKit dependency.
+- `src/deferred_summary.py` — `is_placeholder_summary()`, `upgrade_session_summary()` (Anthropic Haiku background task).
+- `src/date_resolution.py` — `resolve_relative_date()` pure date math. No external dependencies.
 - `src/service_health.py` — Unified service health monitor. Tier-based degradation (CRITICAL/IMPORTANT/OPTIONAL), sync/async call wrappers with timeout, session start gating, LLM context injection for degraded services.
 - `src/data/analysis.py` — Deterministic analysis: diff, summarize, trends, flags, categories, ungraded assignments. All return human-readable strings.
 - `src/data/snapshot_reader.py` — Reads JSON snapshots from local clone. Fuzzy class name resolution via `resolve_slug()`.

@@ -232,7 +232,7 @@ def find_assignment(reader: SnapshotReader, slug: str, assignment_name: str) -> 
 
     lines = []
     for a in matches:
-        lines.append(_format_assignment(a))
+        lines.append(format_assignment(a))
     return "\n\n".join(lines)
 
 
@@ -564,7 +564,7 @@ def get_modified_assignments(
     return "\n".join(all_modified)
 
 
-def _format_assignment(a: Assignment) -> str:
+def format_assignment(a: Assignment) -> str:
     """Format a single assignment as a readable string."""
     parts = [a.name]
     if a.due_date:

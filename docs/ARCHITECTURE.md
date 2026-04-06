@@ -20,19 +20,19 @@ flowchart TB
     subgraph LK["LiveKit Cloud (managed)"]
         Room["WebRTC Room\nmedia routing"]
         STT["Deepgram Nova 3\nSTT via inference gateway"]
-        LLM["GPT-4.1\nLLM via inference gateway"]
+        LLM["Claude Sonnet 4.6\nLLM via inference gateway"]
         TTS_LK["Cartesia sonic-3\ndefault TTS"]
     end
 
     subgraph Agent["Agent Worker (sally-schoolwork)"]
-        MyAgent["my_agent()\nsession orchestrator"]
-        Tools["17 @function_tools\nresolve_date, list_classes, etc."]
+        MyAgent["agent.py: my_agent()\nsession orchestrator"]
+        Tools["assistant.py: 17 @function_tools\nresolve_date, list_classes, etc."]
         Analysis["analysis.py\ndeterministic computation"]
         Reader["SnapshotReader\nfilesystem reads"]
         Health["ServiceHealth\ntier-based error detection"]
-        Persona["load_persona()\nconfig merge + templating"]
-        UserCtx["_build_user_context()\nprofile + session history"]
-        Close["_save_session_history()\nsync close handler"]
+        Persona["persona.py: load_persona()\nconfig merge + templating"]
+        Lifecycle["session_lifecycle.py\ncontext, TTS, greeting, close"]
+        DeferredSum["deferred_summary.py\nbackground LLM summarization"]
     end
 
     subgraph External["External Services (managed)"]
@@ -40,7 +40,7 @@ flowchart TB
         Hedra["Hedra\nphotorealistic avatar"]
         Lemon["LemonSlice\ncartoon avatar"]
         Supa["Supabase\nuser_profiles\nsession_history\nsession_messages"]
-        OAI["OpenAI (direct)\nGPT-4.1-mini\ndeferred summarization"]
+        Anth["Anthropic (direct)\nClaude Haiku 4.5\ndeferred summarization"]
     end
 
     subgraph Upstream["Data Pipeline (table-mutation-tracker)"]
@@ -95,13 +95,13 @@ flowchart TB
     Tools -->|"RPC navigateTo"| NavHandler
 
     %% Supabase
-    UserCtx -->|"read"| Supa
-    Close -->|"write"| Supa
+    Lifecycle -->|"read"| Supa
+    Lifecycle -->|"write"| Supa
     MyAgent -->|"save_message per turn"| Supa
 
     %% Deferred summarization
-    MyAgent -.->|"background task"| OAI
-    OAI -.->|"update summary"| Supa
+    DeferredSum -.->|"background task"| Anth
+    Anth -.->|"update summary"| Supa
 
     %% Styling
     style Analysis fill:#c8e6c9,color:#000
@@ -109,8 +109,8 @@ flowchart TB
     style Tools fill:#c8e6c9,color:#000
     style Health fill:#c8e6c9,color:#000
     style Persona fill:#c8e6c9,color:#000
-    style Close fill:#c8e6c9,color:#000
-    style UserCtx fill:#c8e6c9,color:#000
+    style Lifecycle fill:#c8e6c9,color:#000
+    style DeferredSum fill:#c8e6c9,color:#000
     style STT fill:#ffe0b2,color:#000
     style LLM fill:#ffe0b2,color:#000
     style TTS_LK fill:#ffe0b2,color:#000
@@ -118,7 +118,7 @@ flowchart TB
     style Hedra fill:#bbdefb,color:#000
     style Lemon fill:#bbdefb,color:#000
     style Supa fill:#bbdefb,color:#000
-    style OAI fill:#ffe0b2,color:#000
+    style Anth fill:#ffe0b2,color:#000
     style Room fill:#bbdefb,color:#000
 ```
 
@@ -135,7 +135,7 @@ sequenceDiagram
     participant U as User (Browser)
     participant LK as LiveKit Cloud
     participant DG as Deepgram
-    participant GPT as GPT-4.1
+    participant Claude as Claude Sonnet 4.6
     participant A as Agent Worker
     participant Py as analysis.py
     participant FS as SnapshotReader
@@ -145,9 +145,9 @@ sequenceDiagram
     U->>LK: Audio stream (WebRTC)
     LK->>DG: Audio → STT
     DG-->>LK: "What's my geometry grade?"
-    LK->>GPT: Transcript + system prompt + tools
-    Note over GPT: Nondeterministic: chooses tool
-    GPT->>A: tool_call: get_class_summary(class_name="geometry")
+    LK->>Claude: Transcript + system prompt + tools
+    Note over Claude: Nondeterministic: chooses tool
+    Claude->>A: tool_call: get_class_summary(class_name="geometry")
     A->>Py: summarize_class(reader, "geometry")
     Py->>FS: read latest snapshot
     FS-->>Py: Assignment objects
@@ -155,24 +155,24 @@ sequenceDiagram
     Py-->>A: "Geometry: C (75%), 42 assignments, Teacher: Burrell"
     A->>FE: RPC navigateTo(date="2026-04-03", class="geometry")
     Note over FE: Browser navigates to geometry tab
-    A-->>GPT: tool_output: "Geometry: C (75%), 42 assignments..."
-    Note over GPT: Nondeterministic: narrates output
-    GPT->>TTS: "Geometry is sitting at a C, seventy-five percent..."
+    A-->>Claude: tool_output: "Geometry: C (75%), 42 assignments..."
+    Note over Claude: Nondeterministic: narrates output
+    Claude->>TTS: "Geometry is sitting at a C, seventy-five percent..."
     TTS-->>LK: Audio stream
     LK-->>U: Audio (user hears response)
 ```
 
 ![Request Flow](architecture-request-flow.png)
 
-**Key insight:** The deterministic boundary is between the agent worker and GPT-4.1. Everything inside the agent (tool dispatch, analysis, snapshot reading) is tested and predictable. The LLM layer on both sides (tool selection, narration) is nondeterministic.
+**Key insight:** The deterministic boundary is between the agent worker and Claude Sonnet 4.6. Everything inside the agent (tool dispatch, analysis, snapshot reading) is tested and predictable. The LLM layer on both sides (tool selection, narration) is nondeterministic.
 
 ## Runtime Boundaries
 
 | Runtime | Process | Repo | What runs there |
 |---------|---------|------|----------------|
-| **LiveKit Cloud** | Room server | (managed) | WebRTC room, media routing. Acts as gateway: routes to Deepgram (STT), OpenAI (LLM), Cartesia (TTS). |
+| **LiveKit Cloud** | Room server | (managed) | WebRTC room, media routing, agent dispatch. STT/LLM/TTS now use direct provider plugins (not inference gateway). |
 | **Deepgram** | STT service | (managed) | Speech-to-text via LiveKit inference gateway. Rate-limited (429s on rapid reconnects). |
-| **OpenAI** | LLM service | (managed) | GPT-4.1 for agent conversation (via LiveKit). GPT-4.1-mini for deferred summarization (direct AsyncOpenAI call). |
+| **Anthropic** | LLM service | (managed) | Claude Sonnet 4.6 for agent conversation (direct plugin). Claude Haiku 4.5 for deferred summarization (direct AsyncAnthropic call). |
 | **ElevenLabs** | TTS service | (managed) | Voice cloning + TTS when persona uses `tts_provider: "elevenlabs"`. Voice settings (stability, similarity, speed) in persona config. |
 | **Cartesia** | TTS service | (managed) | Default TTS via LiveKit inference gateway. Used when no ElevenLabs voice ID configured. |
 | **Agent worker** | Python (`agent.py start`) | sally-schoolwork | `my_agent()`, 17 `@function_tool` methods, `ServiceHealth`, persona loading, Supabase calls, git pull, close handler. |
@@ -193,22 +193,22 @@ sequenceDiagram
 |-----------|-------------|-----------|
 | `resolve_relative_date()` | Date math from natural language | test_navigation.py |
 | `analysis.py` (17 functions) | Summarize, diff, trend, flag, ungraded | test_analysis.py |
-| `_format_assignment()`, `_format_changes()` | String formatting for tool output | test_navigation.py |
+| `format_assignment()`, `_format_changes()` | String formatting for tool output | test_navigation.py |
 | `SnapshotReader` | Filesystem reads, slug resolution | test_analysis.py |
-| `_save_session_history()` | Session summary from messages, dynamic class keywords | (integration) |
-| `_is_placeholder_summary()` | Regex detection of placeholder summaries | test_navigation.py |
+| `save_session_history()` | Session summary from messages, dynamic class keywords | (integration) |
+| `is_placeholder_summary()` | Regex detection of placeholder summaries | test_navigation.py |
 | `ServiceHealth` | Error detection, tier classification, gating | test_service_health.py |
 | `load_persona()` | Config merge, markdown concatenation, templating | (integration) |
-| `_build_user_context()` | Profile fetch, session history, onboarding flag | (integration) |
-| `_build_data_context()` | Class overview, date annotation | (integration) |
-| `_configure_tts()` | TTS provider selection from persona config | (integration) |
+| `build_user_context()` | Profile fetch, session history, onboarding flag | (integration) |
+| `build_data_context()` | Class overview, date annotation | (integration) |
+| `configure_tts()` | TTS provider selection from persona config | (integration) |
 
 ### Nondeterministic (orange) — LLM, STT, TTS, external APIs
 
 | Component | What varies | Controlled by | Failure mode |
 |-----------|------------|---------------|-------------|
-| **GPT-4.1 tool selection** | Which tool it calls for a user question | System prompt + tool descriptions | Wrong tool, no tool, hallucinated args |
-| **GPT-4.1 narration** | Wording, tone, length, format of spoken response | base.md WRONG/RIGHT examples | Bullets, emojis, verbosity, markdown |
+| **Claude Sonnet 4.6 tool selection** | Which tool it calls for a user question | System prompt + tool descriptions | Wrong tool, no tool, hallucinated args |
+| **Claude Sonnet 4.6 narration** | Wording, tone, length, format of spoken response | base.md WRONG/RIGHT examples | Bullets, emojis, verbosity, markdown |
 | **Onboarding flow** | Whether LLM asks 1 question per turn | base.md CRITICAL RULE | Batches Q2+Q3, adds Q4, skips show_capabilities |
 | **Guardrail compliance** | Whether LLM redirects out-of-scope questions | base.md guardrails section | Lectures instead of redirecting |
 | **Deepgram STT** | Transcription accuracy | Audio quality, accent | Mishears ("Dave" → "Dev"), 429 rate limit |
@@ -224,11 +224,11 @@ sequenceDiagram
 User speaks
     ↓ [NONDETERMINISTIC: Deepgram STT]
 Transcript text
-    ↓ [NONDETERMINISTIC: GPT-4.1 tool selection]
+    ↓ [NONDETERMINISTIC: Claude Sonnet 4.6 tool selection]
 Tool call with args
     ↓ [DETERMINISTIC: Python @function_tool → analysis.py]
 Human-readable result string
-    ↓ [NONDETERMINISTIC: GPT-4.1 narration]
+    ↓ [NONDETERMINISTIC: Claude Sonnet 4.6 narration]
 Spoken response text
     ↓ [NONDETERMINISTIC: TTS rendering]
 Audio to user
@@ -283,7 +283,7 @@ flowchart LR
     subgraph AgentPath["Agent Path (sally-schoolwork)"]
         DataRepo -->|"git clone at prewarm\ngit pull per session"| Reader["SnapshotReader\n(local filesystem)"]
         Reader --> Analysis["analysis.py\n(deterministic)"]
-        Analysis -->|"human-readable string"| LLM["GPT-4.1\n(nondeterministic)"]
+        Analysis -->|"human-readable string"| LLM["Claude Sonnet 4.6\n(nondeterministic)"]
         LLM -->|"spoken narration"| TTS["TTS\n(EL/Cartesia)"]
         TTS -->|"audio"| User["User hears answer"]
     end
@@ -317,7 +317,7 @@ sally-schoolwork (agent)
   ├── Writes to → Supabase (profiles, sessions, messages)
   ├── Sends RPC to → table-mutation-tracker frontend (navigateTo)
   └── Uses → LiveKit Cloud (STT, LLM, TTS, room), Hedra/LemonSlice (avatar),
-             ElevenLabs (TTS), OpenAI direct (deferred summarization)
+             ElevenLabs (TTS), Anthropic direct (deferred summarization)
 
 table-mutation-data (data, no code)
   ├── Written by → n8n + scraper (table-mutation-tracker)

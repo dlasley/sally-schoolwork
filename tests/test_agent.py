@@ -8,7 +8,8 @@ calls the right tool and produces an appropriate response.
 import pytest
 from livekit.agents import AgentSession, inference, llm, mock_tools
 
-from agent import Assistant, load_persona
+from assistant import Assistant
+from persona import load_persona
 
 
 def _llm() -> llm.LLM:

@@ -7,8 +7,8 @@ and which tools should/shouldn't trigger navigation.
 import json
 
 from data.analysis import (
-    _format_assignment,
     _format_changes,
+    format_assignment,
 )
 
 # --- Payload construction tests ---
@@ -100,7 +100,7 @@ class TestToolNavigationAlignment:
         """Tools that show class-specific data should call _navigate_browser."""
         import inspect
 
-        from agent import Assistant
+        from assistant import Assistant
 
         navigating = [
             "list_assignments",
@@ -124,7 +124,7 @@ class TestToolNavigationAlignment:
         """Aggregate tools should NOT call _navigate_browser."""
         import inspect
 
-        from agent import Assistant
+        from assistant import Assistant
 
         non_navigating = [
             "list_classes",
@@ -148,7 +148,7 @@ class TestToolNavigationAlignment:
 
 
 class TestFormatHelpers:
-    def test_format_assignment(self):
+    def testformat_assignment(self):
         from data.models import Assignment
 
         a = Assignment(
@@ -159,14 +159,14 @@ class TestFormatHelpers:
             grade="B+",
             percent=90,
         )
-        result = _format_assignment(a)
+        result = format_assignment(a)
         assert "Test HW" in result
         assert "2026-03-10" in result
         assert "18/20" in result
         assert "B+" in result
         assert "90%" in result
 
-    def test_format_assignment_no_grade(self):
+    def testformat_assignment_no_grade(self):
         from data.models import Assignment
 
         a = Assignment(
@@ -175,7 +175,7 @@ class TestFormatHelpers:
             category="Homework",
             score_raw="--/20",
         )
-        result = _format_assignment(a)
+        result = format_assignment(a)
         assert "Ungraded" in result
         assert "--/20" in result
         assert "Grade" not in result
@@ -249,7 +249,7 @@ class TestResolveDateArithmetic:
     def test_last_friday_from_saturday(self):
         from datetime import date
 
-        from agent import resolve_relative_date
+        from date_resolution import resolve_relative_date
 
         result = resolve_relative_date("last Friday", today=date(2026, 4, 4))
         assert result == date(2026, 4, 3)
@@ -258,7 +258,7 @@ class TestResolveDateArithmetic:
         """'last Friday' on a Friday means the previous week."""
         from datetime import date
 
-        from agent import resolve_relative_date
+        from date_resolution import resolve_relative_date
 
         result = resolve_relative_date("last Friday", today=date(2026, 4, 3))
         assert result == date(2026, 3, 27)
@@ -267,7 +267,7 @@ class TestResolveDateArithmetic:
         """'the Friday before 2026-04-03' -> March 27."""
         from datetime import date
 
-        from agent import resolve_relative_date
+        from date_resolution import resolve_relative_date
 
         result = resolve_relative_date(
             "the Friday before 2026-04-03", today=date(2026, 4, 4)
@@ -278,7 +278,7 @@ class TestResolveDateArithmetic:
         """'the Friday before' from Saturday Apr 4 -> Mar 27."""
         from datetime import date
 
-        from agent import resolve_relative_date
+        from date_resolution import resolve_relative_date
 
         result = resolve_relative_date("the Friday before", today=date(2026, 4, 4))
         assert result == date(2026, 3, 27)
@@ -286,7 +286,7 @@ class TestResolveDateArithmetic:
     def test_yesterday(self):
         from datetime import date
 
-        from agent import resolve_relative_date
+        from date_resolution import resolve_relative_date
 
         result = resolve_relative_date("yesterday", today=date(2026, 4, 4))
         assert result == date(2026, 4, 3)
@@ -294,7 +294,7 @@ class TestResolveDateArithmetic:
     def test_today(self):
         from datetime import date
 
-        from agent import resolve_relative_date
+        from date_resolution import resolve_relative_date
 
         result = resolve_relative_date("today", today=date(2026, 4, 4))
         assert result == date(2026, 4, 4)
@@ -302,7 +302,7 @@ class TestResolveDateArithmetic:
     def test_last_monday(self):
         from datetime import date
 
-        from agent import resolve_relative_date
+        from date_resolution import resolve_relative_date
 
         # Friday Apr 4 -> previous Monday is Mar 30
         result = resolve_relative_date("last Monday", today=date(2026, 4, 4))
@@ -311,7 +311,7 @@ class TestResolveDateArithmetic:
     def test_unresolvable_returns_none(self):
         from datetime import date
 
-        from agent import resolve_relative_date
+        from date_resolution import resolve_relative_date
 
         result = resolve_relative_date("sometime in the past", today=date(2026, 4, 4))
         assert result is None
@@ -322,29 +322,29 @@ class TestResolveDateArithmetic:
 
 class TestIsPlaceholderSummary:
     def test_discussed_classes_pattern(self):
-        from agent import _is_placeholder_summary
+        from deferred_summary import is_placeholder_summary
 
         assert (
-            _is_placeholder_summary("Discussed Geometry, English 10 (8 messages).")
+            is_placeholder_summary("Discussed Geometry, English 10 (8 messages).")
             is True
         )
 
     def test_conversation_pattern(self):
-        from agent import _is_placeholder_summary
+        from deferred_summary import is_placeholder_summary
 
-        assert _is_placeholder_summary("Conversation with 12 messages.") is True
+        assert is_placeholder_summary("Conversation with 12 messages.") is True
 
     def test_llm_generated_summary(self):
-        from agent import _is_placeholder_summary
+        from deferred_summary import is_placeholder_summary
 
         assert (
-            _is_placeholder_summary(
+            is_placeholder_summary(
                 "The user asked about their Geometry grade trend and missing assignments."
             )
             is False
         )
 
     def test_empty_string(self):
-        from agent import _is_placeholder_summary
+        from deferred_summary import is_placeholder_summary
 
-        assert _is_placeholder_summary("") is False
+        assert is_placeholder_summary("") is False

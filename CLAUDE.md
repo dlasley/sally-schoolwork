@@ -22,7 +22,7 @@ lk agent logs                                     # Tail runtime logs
 
 ## Critical patterns
 
-**Tools do analysis, LLM narrates.** The `@function_tool` methods in [agent.py](src/agent.py) call deterministic Python in [analysis.py](src/data/analysis.py) and return human-readable strings. The LLM never processes raw data — it only narrates pre-computed summaries. Do not move analysis logic into instructions or prompts.
+**Tools do analysis, LLM narrates.** The `@function_tool` methods in [assistant.py](src/assistant.py) call deterministic Python in [analysis.py](src/data/analysis.py) and return human-readable strings. The LLM never processes raw data — it only narrates pre-computed summaries. Do not move analysis logic into instructions or prompts.
 
 **TDD is required for agent behavior.** When modifying instructions, tool descriptions, or adding tools, write failing tests first (`tests/test_agent.py` using `mock_tools`/`judge()`), then iterate until they pass. Never guess what will work.
 
