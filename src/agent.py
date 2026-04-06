@@ -552,6 +552,7 @@ class Assistant(Agent):
             slug = reader.resolve_slug(class_name)
             if not slug:
                 return self._class_not_found(class_name)
+        await self._navigate_browser(date="", slug="deleted")
         return get_deleted_assignments(reader, slug=slug, days=days)
 
     @function_tool()

@@ -109,6 +109,7 @@ class TestToolNavigationAlignment:
             "compare_dates",
             "get_flagged_assignments",
             "get_category_breakdown",
+            "get_deleted_assignments_list",
             "show_capabilities",
         ]
         for tool_name in navigating:
@@ -130,7 +131,6 @@ class TestToolNavigationAlignment:
             "get_recent_changes",
             "get_grade_trend",
             "get_overall_summary",
-            "get_deleted_assignments_list",
             "get_score_changes",
             "save_user_profile",
             "get_ungraded_assignments",
