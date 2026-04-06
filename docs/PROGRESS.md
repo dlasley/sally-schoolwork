@@ -161,26 +161,31 @@ None — all changes committed as of 2026-04-05 (commit `7f5c9fa`).
 ### Open — needs investigation
 - **Session history not injected for returning users**: Observed in session a514363f — "What did we talk about last time?" returned "I don't have access to your previous conversations" despite session_history rows existing in Supabase. Root cause unknown.
 
-### Open — fixes in code, need clean retest
-Note: the 2026-04-04 testing session may have tested pre-fix code (agent not restarted between changes). All items below need retesting with a confirmed fresh agent restart.
+### Verified working (2026-04-06 clean test with Claude Sonnet 4.6)
+- **Onboarding Q1/Q2/Q3 individual**: PASS — one question per response, no batching.
+- **Onboarding Q4 not asked**: PASS — profile saved without communication_preferences.
+- **show_capabilities called after onboarding**: PASS — tool called, help page opened in browser.
+- **"Last Friday" resolved correctly**: PASS — April 3rd.
+- **"The Friday before" resolved correctly**: PASS — March 27th.
+- **Ungraded assignments tool**: PASS — returns actual ungraded items (no false negative).
+- **Guardrail redirect**: PASS — "outside my wheelhouse" instead of lecturing.
+- **Returning user greeting with name**: PASS — "Hey Dave!"
+- **Session history injection**: PASS — "Last time you discussed Geometry, English 10, AP Environmental Science."
+- **Deferred summarization**: PASS — placeholder summaries upgraded to LLM-generated.
+- **Deleted assignments navigation**: Not fully tested (browser navigation to `/deleted` not confirmed).
 
-- **Onboarding Q2+Q3 batching**: Fix: CRITICAL RULE + WRONG/RIGHT Q2 example in base.md.
-- **Onboarding Q4 still asked**: Fix: removed `communication_preferences` from `save_user_profile` tool.
-- **show_capabilities not called after onboarding**: Fix in base.md. Partially worked in session 6498e922.
-- **Capabilities shown as bullet list**: Fix: WRONG/RIGHT rule in base.md.
-- **"Last Friday" resolved to wrong date**: Fix: reference date extraction in `resolve_relative_date()`. Worked in session 6498e922.
-- **"The Friday before" broken**: Fix: "before" keyword adds `extra_weeks` offset.
-- **Ungraded assignments false negative**: Fix: `get_ungraded_assignments` tool added.
-- **Bullet points from tool output**: Fix: WRONG/RIGHT rule in base.md.
-- **Out-of-scope school questions**: Fix: guardrail redirect in base.md.
-- **Returning user greeting doesn't use name**: Fix: string interpolation into greeting.
+### Open — instruction compliance, need retest
+Fixes added to base.md. Will be tested alongside future deterministic changes.
+- **"Here are..." list intros**: Claude starts responses with "Here are the ungraded assignments:" and "Here are all the deleted assignments:". Fix: added "Never start with 'Here are'" rule + additional WRONG/RIGHT examples.
+- **Markdown bold/italic in speech**: Claude uses `**bold**` in responses (e.g. `**C (75%)**`). Fix: added explicit "no **bold**, no *italic*" to output rules.
+- **Emoji in farewell**: Claude used 👋. Fix: added specific emoji example to prohibition rule.
+- **Narrating internal process**: Claude says "Let me resolve that date!" before tool calls. Fix: added "Do not narrate your internal process" rule.
 
 ### Open — minor / accepted
-- **Hedra avatar returns 500 intermittently**: Gracefully handled by ServiceHealth.
+- **Hedra avatar blocks audio pipeline**: Avatar disabled pending investigation. Video track never publishes, blocking all TTS audio output.
 - **Session memory race condition**: Close handler write may not complete before next session queries. Only affects back-to-back sessions (<10s apart).
-- **GPT-4.1 follows persona catchphrases ~70%**: Known LLM instruction-following limitation.
 - **`.gitignore` and `lk agent deploy` tension**: Gitignored files excluded from deploy build context. Workaround: env var fallbacks.
-- **STT transcription accuracy**: "Dave" transcribed as "Dev". STT-level issue, not agent logic.
+- **STT transcription accuracy**: "Dave" transcribed as "Dev", "Missing" as "Mystic". STT-level issue, not agent logic.
 
 ### Open — architectural debt (identified 2026-04-05 review)
 - **`SnapshotReader.refresh()` swallows exceptions**: `refresh()` catches errors internally without re-raising, so `ServiceHealth` marks git as healthy on failed pulls. Needs fix.

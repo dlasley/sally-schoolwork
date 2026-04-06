@@ -25,11 +25,11 @@ from livekit.agents import (
     room_io,
 )
 from livekit.plugins import (
+    anthropic,
     deepgram,
     elevenlabs,
     hedra,
     noise_cancellation,
-    openai,
     silero,
 )
 from livekit.plugins.turn_detector.multilingual import MultilingualModel
@@ -717,7 +717,7 @@ async def _upgrade_session_summary(last_session: dict, user_store) -> None:
     Runs as a background task at session start. All blocking Supabase calls
     are wrapped in asyncio.to_thread() to avoid blocking the event loop.
     """
-    from openai import AsyncOpenAI
+    import anthropic as anthropic_sdk
 
     prev_session_id = last_session.get("session_id")
     if not prev_session_id:
@@ -733,9 +733,10 @@ async def _upgrade_session_summary(last_session: dict, user_store) -> None:
             return
 
         transcript = "\n".join(f"{m['role']}: {m['content']}" for m in messages)
-        client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-        completion = await client.chat.completions.create(
-            model="gpt-4.1-mini",
+        client = anthropic_sdk.AsyncAnthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
+        completion = await client.messages.create(
+            model="claude-haiku-4-5-20251001",
+            max_tokens=256,
             messages=[
                 {
                     "role": "user",
@@ -748,7 +749,7 @@ async def _upgrade_session_summary(last_session: dict, user_store) -> None:
                 }
             ],
         )
-        new_summary = (completion.choices[0].message.content or "").strip()
+        new_summary = (completion.content[0].text or "").strip()
         if new_summary:
             await asyncio.to_thread(
                 user_store.update_session_summary, prev_session_id, new_summary
@@ -1017,8 +1018,8 @@ async def my_agent(ctx: JobContext):
     else:
         health.mark_healthy("stt")
 
-    if not os.getenv("OPENAI_API_KEY"):
-        health.mark_failed("llm", "OPENAI_API_KEY not set")
+    if not os.getenv("ANTHROPIC_API_KEY"):
+        health.mark_failed("llm", "ANTHROPIC_API_KEY not set")
     else:
         health.mark_healthy("llm")
 
@@ -1031,8 +1032,8 @@ async def my_agent(ctx: JobContext):
     session = AgentSession[SessionData](
         userdata=session_data,
         stt=deepgram.STT(model="nova-3", language="multi"),
-        llm=openai.LLM(
-            model="gpt-4.1",
+        llm=anthropic.LLM(
+            model="claude-sonnet-4-6",
             temperature=persona.get("llm_temperature", 0.7),
         ),
         tts=tts,
