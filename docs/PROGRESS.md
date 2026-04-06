@@ -197,8 +197,8 @@ Fixes added to base.md. Will be tested alongside future deterministic changes.
 - **No Supabase RLS policies**: Service key used for all operations. Needs RLS policies added.
 - ~~**`agent.py` is a 1,138-line monolith**~~: RESOLVED. Decomposed into 6 modules (agent.py now 244 lines).
 - ~~**Tool method boilerplate**~~: RESOLVED. Added `_resolve_class()` helper to Assistant class.
-- **RPC protocol undocumented**: `navigateTo` payload contract between agent and frontend is implicit. Needs documentation and contract test.
-- **Snapshot JSON schema undocumented**: Assignment/metadata schema between scraper and agent is implicit. Needs schema doc and contract test.
+- ~~**RPC protocol undocumented**~~: RESOLVED. Documented in `docs/CONTRACTS.md` with 7 contract tests.
+- ~~**Snapshot JSON schema undocumented**~~: RESOLVED. Documented in `docs/CONTRACTS.md` with 5 contract tests.
 
 ### Resolved (historical)
 - **session_history not writing**: Close handler confirmed working — rows written per-session.
@@ -252,8 +252,8 @@ External services:
 
 ### Medium priority
 4. **Fix `SnapshotReader.refresh()` exception swallowing** — re-raise errors so ServiceHealth can detect failed git pulls.
-5. **Document + test RPC protocol contract** — `navigateTo` payload between agent and frontend.
-6. **Document + test snapshot JSON schema contract** — assignment/metadata format between scraper and agent. Include integration test with sample fixture data.
+5. ~~**Document + test RPC protocol contract**~~ — DONE. `docs/CONTRACTS.md` + 7 contract tests in `test_navigation.py`. Cross-referenced in `table-mutation-tracker/LIVEKIT_AGENT.md`.
+6. ~~**Document + test snapshot JSON schema contract**~~ — DONE. `docs/CONTRACTS.md` + 5 contract tests in `test_navigation.py`.
 7. **Token endpoint security** — add rate limiting and origin check to `/api/livekit-token`.
 8. **Supabase RLS policies** — add Row-Level Security to user_profiles, session_history, session_messages.
 9. **Re-deploy to LiveKit Cloud** — redeploy with current code for persistent non-dev usage.

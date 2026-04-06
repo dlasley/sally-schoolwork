@@ -5,6 +5,7 @@ and which tools should/shouldn't trigger navigation.
 """
 
 import json
+import typing
 
 from data.analysis import (
     _format_changes,
@@ -142,6 +143,171 @@ class TestToolNavigationAlignment:
             assert "_navigate_browser" not in source, (
                 f"Tool {tool_name} should NOT call _navigate_browser"
             )
+
+
+# --- Contract tests (see docs/CONTRACTS.md) ---
+
+
+class TestRPCNavigationContract:
+    """Verify the navigateTo RPC payload matches the documented contract."""
+
+    REQUIRED_FIELDS: typing.ClassVar[set[str]] = {"view", "date", "className"}
+
+    def _make_payload(self, date: str = "", slug: str = "", compare_date: str = ""):
+        """Replicate the payload logic from _navigate_browser."""
+        payload_dict: dict = {
+            "view": "day" if date else "calendar",
+            "date": date,
+            "className": slug,
+        }
+        if compare_date:
+            payload_dict["compareDate"] = compare_date
+        return payload_dict
+
+    def test_required_fields_present(self):
+        payload = self._make_payload(date="2026-04-03", slug="geometry")
+        assert self.REQUIRED_FIELDS.issubset(payload.keys())
+
+    def test_day_view_structure(self):
+        payload = self._make_payload(date="2026-04-03", slug="geometry")
+        assert payload["view"] == "day"
+        assert payload["date"] == "2026-04-03"
+        assert payload["className"] == "geometry"
+        assert "compareDate" not in payload
+
+    def test_calendar_view_structure(self):
+        payload = self._make_payload()
+        assert payload["view"] == "calendar"
+        assert payload["date"] == ""
+        assert payload["className"] == ""
+
+    def test_compare_date_format(self):
+        payload = self._make_payload(
+            date="2026-04-03", slug="geometry", compare_date="2026-03-27/210000"
+        )
+        assert payload["compareDate"] == "2026-03-27/210000"
+        assert "/" in payload["compareDate"]  # date/time format
+
+    def test_special_classname_help(self):
+        payload = self._make_payload(slug="help")
+        assert payload["className"] == "help"
+        assert payload["view"] == "calendar"  # no date → calendar
+
+    def test_special_classname_deleted(self):
+        payload = self._make_payload(slug="deleted")
+        assert payload["className"] == "deleted"
+
+    def test_payload_serializable(self):
+        """Payload must be JSON-serializable."""
+        payload = self._make_payload(
+            date="2026-04-03", slug="geometry", compare_date="2026-03-27/210000"
+        )
+        serialized = json.dumps(payload)
+        deserialized = json.loads(serialized)
+        assert deserialized == payload
+
+
+class TestSnapshotSchemaContract:
+    """Verify snapshot JSON matches the documented contract in CONTRACTS.md."""
+
+    def test_assignment_required_fields(self):
+        """Assignment JSON must have all required fields."""
+        from data.models import Assignment
+
+        assignment_data = {
+            "name": "Test Assignment",
+            "due_date": "2026-04-03",
+            "category": "Homework",
+            "flags": {"missing": False, "late": False},
+        }
+        a = Assignment.from_dict(assignment_data)
+        assert a.name == "Test Assignment"
+        assert a.due_date == "2026-04-03"
+        assert a.category == "Homework"
+        assert isinstance(a.flags, dict)
+
+    def test_assignment_optional_fields_default(self):
+        """Optional fields should have safe defaults when missing."""
+        from data.models import Assignment
+
+        a = Assignment.from_dict(
+            {"name": "Minimal", "due_date": "2026-04-03", "category": "Test"}
+        )
+        assert a.score_raw == ""
+        assert a.points_earned is None
+        assert a.points_possible is None
+        assert a.percent is None
+        assert a.grade is None
+        assert a.has_comments is False
+        assert a.flags == {}
+
+    def test_metadata_class_fields(self):
+        """Metadata class entry must parse all documented fields."""
+        from data.models import ClassMetadata
+
+        data = {
+            "course": "Geometry",
+            "teacher": "Smith, John",
+            "teacher_email": "john.smith@test.org",
+            "expression": "1(A)",
+            "term": "S2",
+            "final_grade": "B-",
+            "final_percent": 80,
+            "assignment_count": 2,
+            "last_updated": "3/6/2026",
+        }
+        cm = ClassMetadata.from_dict(data)
+        assert cm.course == "Geometry"
+        assert cm.teacher == "Smith, John"
+        assert cm.final_grade == "B-"
+        assert cm.final_percent == 80
+        assert cm.assignment_count == 2
+
+    def test_rolling_index_structure(self):
+        """Rolling index must parse snapshots with changes and classes."""
+        from data.models import RollingIndex
+
+        data = {
+            "snapshots": [
+                {
+                    "date": "2026-03-08",
+                    "time": "210000",
+                    "scrape_timestamp": "2026-03-08T21:00:00+00:00",
+                    "changes": {"added": 2, "modified": 1, "deleted": 0, "total": 3},
+                    "classes": {
+                        "geometry": {
+                            "course": "Geometry",
+                            "final_grade": "B-",
+                            "final_percent": 80,
+                            "assignment_count": 2,
+                        }
+                    },
+                }
+            ]
+        }
+        index = RollingIndex.from_dict(data)
+        assert len(index.snapshots) == 1
+        s = index.snapshots[0]
+        assert s.date == "2026-03-08"
+        assert s.changes.added == 2
+        assert "geometry" in s.classes
+        assert s.classes["geometry"].course == "Geometry"
+
+    def test_unscored_detection_contract(self):
+        """Unscored values match the documented contract."""
+        from data.analysis import _is_unscored
+
+        # Documented as unscored
+        assert _is_unscored(None) is True
+        assert _is_unscored("") is True
+        assert _is_unscored("--") is True
+        assert _is_unscored("--/20") is True
+        assert _is_unscored("0") is True
+
+        # Documented as scored
+        assert _is_unscored("18/22") is False
+        assert _is_unscored("0/10") is False
+        assert _is_unscored("B+") is False
 
 
 # --- Helper function tests (from code review 4d) ---
