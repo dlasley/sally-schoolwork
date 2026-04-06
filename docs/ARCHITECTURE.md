@@ -303,6 +303,66 @@ flowchart LR
 
 **Two paths to the same data:** The agent reads via local git clone (fast, filesystem I/O). The frontend reads via GitHub API (SSR on Vercel). They never share data with each other — only navigation commands (RPC).
 
+## Persona Config Architecture
+
+### Current design: split config with gitignore boundary
+
+Persona configuration is split across committed and gitignored files, with the git boundary drawn at PII/secrets:
+
+```
+personas/
+  config.json            ← Committed. Provider choices, temperature, greetings.
+  config.local.json      ← Gitignored. Real names, service IDs, voice/avatar IDs.
+  base.md                ← Committed. Shared instructions, onboarding, guardrails.
+  example/persona.md     ← Committed. Template for new personas.
+  <name>/persona.md      ← Committed. Per-persona personality, catchphrases.
+```
+
+`load_persona()` in `persona.py` merges both configs at runtime, with env var fallbacks for deployment (where `config.local.json` doesn't exist).
+
+### What goes where
+
+| Data | File | Why |
+|------|------|-----|
+| `avatar_provider: "hedra"` | config.json | Architecture choice, no secret |
+| `hedra_avatar_id: "710b89..."` | config.local.json | Service-specific ID, tied to personal account |
+| `tts_provider: "elevenlabs"` | config.json | Architecture choice |
+| `elevenlabs_voice_id: "UzmY..."` | config.local.json | Cloned voice ID, personal asset |
+| `elevenlabs_speed: 0.85` | config.local.json | Tuned to specific voice clone |
+| `llm_temperature: 0.4` | config.json | Model behavior, not personal |
+| `greeting: "Hey hey!"` | config.json | Character design, not PII |
+| `student_name: "Jackson"` | config.local.json | Real person's name |
+| Personality, catchphrases | persona.md | Character design, not PII |
+| Onboarding script, guardrails | base.md | Shared behavior rules |
+
+### Design rationale
+
+The split exists because this is a public repo with private data:
+
+1. **Public repo, private student.** The codebase is on public GitHub. Student name, school name, teacher names, and service account IDs must not be committed.
+2. **Persona design is public, persona identity is private.** The *character* of Sally Schoolwork (catchphrases, voice style, guardrails) is shareable. The *voice clone ID* and *avatar image* are personal assets.
+3. **Deployment uses env vars, not local files.** When deployed to LiveKit Cloud, `config.local.json` doesn't exist. `load_persona()` falls back to env vars (`ELEVENLABS_VOICE_ID`, `HEDRA_AVATAR_ID`, etc.) set as Cloud secrets.
+
+### Considered alternatives
+
+**A. Single `config.json` with secrets in env vars only (no `config.local.json`).**
+Rejected because local development requires too many env vars. `config.local.json` is a convenience layer for dev that mirrors what env vars provide in production.
+
+**B. Per-persona local config in subdirectories (`personas/<name>/config.local.json`).**
+Would eliminate the single `config.local.json` and co-locate persona config with persona instructions. Cleaner for many personas. Not done because there are only 3 personas and the current approach works. Worth revisiting if persona count grows.
+
+**C. Merge everything into `config.json` and gitignore service IDs via `.gitignore` patterns.**
+Rejected because gitignore operates on files, not fields. Can't gitignore a JSON key.
+
+**D. Encrypt secrets in committed config (SOPS, age, etc.).**
+Overengineered for a 4-user project. Would add tooling dependency for every contributor.
+
+### Known friction
+
+- Adding a persona requires editing two files (`config.json` + `config.local.json`) plus creating a subdirectory with `persona.md`.
+- `load_persona()` has a 3-layer merge: `config.json` → `config.local.json` → env vars. Complex but documented.
+- Voice settings (`elevenlabs_speed`, etc.) are in `config.local.json` because they're tuned to specific voice clones. If you change the voice, the settings may need retuning. This coupling is implicit.
+
 ## Cross-Repo Dependencies
 
 ```
