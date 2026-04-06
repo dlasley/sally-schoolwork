@@ -24,7 +24,14 @@ from livekit.agents import (
     inference,
     room_io,
 )
-from livekit.plugins import elevenlabs, hedra, noise_cancellation, silero
+from livekit.plugins import (
+    deepgram,
+    elevenlabs,
+    hedra,
+    noise_cancellation,
+    openai,
+    silero,
+)
 from livekit.plugins.turn_detector.multilingual import MultilingualModel
 
 from data.analysis import (
@@ -1003,12 +1010,29 @@ async def my_agent(ctx: JobContext):
         needs_onboarding=needs_onboarding,
     )
 
+    # Validate API keys before creating session
+    if not os.getenv("DEEPGRAM_API_KEY"):
+        health.mark_failed("stt", "DEEPGRAM_API_KEY not set")
+    else:
+        health.mark_healthy("stt")
+
+    if not os.getenv("OPENAI_API_KEY"):
+        health.mark_failed("llm", "OPENAI_API_KEY not set")
+    else:
+        health.mark_healthy("llm")
+
+    # Check if critical services are available before session start
+    ok, reasons = health.can_start_session()
+    if not ok:
+        logger.error("Cannot start session: %s", reasons)
+        return
+
     session = AgentSession[SessionData](
         userdata=session_data,
-        stt=inference.STT(model="deepgram/nova-3", language="multi"),
-        llm=inference.LLM(
-            model="openai/gpt-4.1",
-            extra_kwargs={"temperature": persona.get("llm_temperature", 0.7)},
+        stt=deepgram.STT(model="nova-3", language="multi"),
+        llm=openai.LLM(
+            model="gpt-4.1",
+            temperature=persona.get("llm_temperature", 0.7),
         ),
         tts=tts,
         turn_handling={"turn_detection": MultilingualModel()},
@@ -1016,7 +1040,9 @@ async def my_agent(ctx: JobContext):
         preemptive_generation=True,
     )
 
-    await _start_avatar(health, persona, session, ctx.room)
+    # TODO: Re-enable avatar once Hedra blocking issue is resolved.
+    # Hedra avatar blocks audio output pipeline if video track never publishes.
+    # await _start_avatar(health, persona, session, ctx.room)
 
     await session.start(
         agent=Assistant(instructions=instructions),
