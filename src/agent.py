@@ -33,7 +33,7 @@ from session_lifecycle import (
     configure_tts,
     deliver_greeting,
     save_session_history,
-    start_avatar,  # noqa: F401 — disabled pending Hedra fix, will re-enable
+    start_avatar,
     validate_api_keys,
 )
 
@@ -184,7 +184,7 @@ async def my_agent(ctx: JobContext):
     )
 
     # TODO: Re-enable avatar once Hedra blocking issue is resolved.
-    # await start_avatar(health, persona, session, ctx.room)
+    await start_avatar(health, persona, session, ctx.room)
 
     await session.start(
         agent=Assistant(instructions=instructions),

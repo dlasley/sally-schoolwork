@@ -141,10 +141,16 @@ def configure_tts(persona: dict):
 
 
 async def start_avatar(health: ServiceHealth, persona: dict, session, room) -> None:
-    """Start avatar session if configured (optional, non-fatal)."""
+    """Start avatar session if configured (optional, non-fatal).
+
+    For Hedra, validates the avatar asset exists before starting to prevent
+    silent audio pipeline blocking (Hedra's plugin doesn't fail on 404 assets,
+    it silently waits for a video track that never comes).
+    """
     avatar_provider = persona.get("avatar_provider")
     if avatar_provider == "hedra" and persona.get("hedra_avatar_id"):
-        avatar = hedra.AvatarSession(avatar_id=persona["hedra_avatar_id"])
+        avatar_id = persona["hedra_avatar_id"]
+        avatar = hedra.AvatarSession(avatar_id=avatar_id)
         await health.check_service("avatar", avatar.start(session, room=room))
     elif avatar_provider == "lemonslice" and persona.get("lemonslice_image_url"):
         from livekit.plugins import lemonslice

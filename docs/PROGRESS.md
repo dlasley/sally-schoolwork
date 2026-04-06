@@ -182,7 +182,7 @@ Fixes added to base.md. Will be tested alongside future deterministic changes.
 - **Narrating internal process**: Claude says "Let me resolve that date!" before tool calls. Fix: added "Do not narrate your internal process" rule.
 
 ### Open — minor / accepted
-- **Hedra avatar blocks audio pipeline**: Avatar disabled pending investigation. Video track never publishes, blocking all TTS audio output.
+- **Hedra realtime avatar returning 500**: Hedra API returns `"an unknown error occurred trying to queue a realtime avatar session"` after 3 retries. Account has 46 credits remaining, API key valid for asset operations — issue is on Hedra's realtime session infrastructure. ServiceHealth correctly catches: `avatar/optional: down`. Agent continues voice-only. Filed as Hedra support issue. Avatar re-enabled in code — will work once Hedra fixes their realtime service.
 - **Session memory race condition**: Close handler write may not complete before next session queries. Only affects back-to-back sessions (<10s apart).
 - **`.gitignore` and `lk agent deploy` tension**: Gitignored files excluded from deploy build context. Workaround: env var fallbacks.
 - **STT transcription accuracy**: "Dave" transcribed as "Dev", "Missing" as "Mystic". STT-level issue, not agent logic.
