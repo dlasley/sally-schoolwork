@@ -55,8 +55,10 @@ class SnapshotReader:
             logger.info("Data repo refreshed at %s", self.repo_path)
         except subprocess.CalledProcessError as e:
             logger.error("git pull failed: %s", e.stderr.decode())
+            raise
         except subprocess.TimeoutExpired:
             logger.error("git pull timed out")
+            raise
 
     def get_rolling_index(self) -> RollingIndex:
         """Load and cache the rolling index."""

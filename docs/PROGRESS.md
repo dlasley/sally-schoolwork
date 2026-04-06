@@ -188,7 +188,7 @@ Fixes added to base.md. Will be tested alongside future deterministic changes.
 - **STT transcription accuracy**: "Dave" transcribed as "Dev", "Missing" as "Mystic". STT-level issue, not agent logic.
 
 ### Open — architectural debt (identified 2026-04-05 review)
-- **`SnapshotReader.refresh()` swallows exceptions**: `refresh()` catches errors internally without re-raising, so `ServiceHealth` marks git as healthy on failed pulls. Needs fix.
+- ~~**`SnapshotReader.refresh()` swallows exceptions**~~: RESOLVED. Now re-raises after logging so ServiceHealth can detect failed git pulls.
 - ~~**Deferred summarization uses separate OpenAI client**~~: RESOLVED. Switched to `AsyncAnthropic` (Claude Haiku 4.5) in `deferred_summary.py`. Now uses same provider (Anthropic) as the main agent LLM.
 - **Synchronous close handler is fragile**: Blocking HTTP call in close event may not complete if Supabase is slow. Document for later hardening.
 - **RPC navigation failure invisible to LLM**: `_navigate_browser` is fire-and-forget. If frontend disconnects, agent continues referencing browser. Assess LOE for RPC failure awareness.
@@ -247,7 +247,7 @@ External services:
 
 ### High priority
 1. ~~**Refactor `agent.py` monolith**~~ — DONE. Decomposed into 6 modules: agent.py (244 lines), assistant.py, session_lifecycle.py, persona.py, deferred_summary.py, date_resolution.py. Added `_resolve_class` helper.
-2. **Scrub PII from table-mutation-tracker CLAUDE.md** — real names and school name still present.
+2. ~~**Scrub PII from table-mutation-tracker CLAUDE.md**~~ — VERIFIED CLEAN. No PII found in any tracked files. `private/` dir is gitignored.
 3. **Clean retest of behavior fixes** — onboarding, guardrails, bullets, ungraded tool, date resolution. All code fixes are in place. Follow live testing protocol.
 
 ### Medium priority
