@@ -1,5 +1,7 @@
 # Plan: Grade Tracker Voice/Text Agent
 
+> **Note:** This is a historical planning document from initial development. For current state, progress tracking, and forward-looking plans, see [PROGRESS.md](PROGRESS.md). Implementation diverged from this plan in several areas — the plan below reflects original intent, updated where facts were clearly wrong.
+
 ## Goal
 
 Add a LiveKit agent to the sally-schoolwork project that lets users ask questions about classes, assignments, and grade changes via voice or text. The agent reads snapshot data from the `table-mutation-data` GitHub repo and uses deterministic Python analysis in tool functions, with the LLM handling only conversational interpretation and narration.
@@ -27,7 +29,7 @@ The data layer (`src/data/`) is intentionally decoupled from LiveKit — pure Py
 
 ### Key decisions
 
-- **LLM**: gpt-4.1-mini via LiveKit Inference (already configured). Sufficient for interpreting questions and narrating pre-computed results. No need for a heavier model.
+- **LLM**: GPT-4.1 via LiveKit Inference. Originally planned as gpt-4.1-mini, upgraded for better instruction following and tool selection.
 - **Analysis in tools, not LLM**: Tools fetch snapshots, compute diffs, and return concise text summaries. The LLM never sees raw JSON tables.
 - **Reuse existing diff logic**: Port the core diff algorithm from table-mutation-tracker's `snapshot_store.py` rather than reimplementing. The rolling index provides pre-computed change counts; individual snapshot diffs are computed on demand.
 - **Data access**: Local clone of `dlasley/table-mutation-data`. Cloned in prewarm, pulled at session start. All snapshots available on disk for fast filesystem reads — no GitHub API latency or rate limits. Essential for unscoped queries like "how have geometry scores changed this semester" that span many snapshots. The data repo is small (~7 MB currently, projected <100 MB over a full school year at 3 scrapes/day).
@@ -563,7 +565,7 @@ create table user_profiles (
   name text,
   relation_to_student text,        -- parent, student themselves, grandparent, etc.
   priorities text[],                -- what they want from the app
-  communication_preferences text,   -- e.g., "brief answers", "detailed"
+  -- communication_preferences removed during implementation (not useful in practice)
   created_at timestamptz default now(),
   updated_at timestamptz default now()
 );
@@ -590,8 +592,6 @@ Collected once during the first session (onboarding), updatable if the user want
 - `name` — what the user wants to be called
 - `relation_to_student` — parent, the student, grandparent, other
 - `priorities` — what they care about (e.g., "missing assignments", "grade trends", "specific classes")
-- `communication_preferences` — brief vs. detailed, serious vs. playful
-
 #### Onboarding: persona-specific scripts
 
 Each persona has an onboarding script in their markdown file that collects the same profile fields but in their own voice. The agent checks if a profile exists for the device ID — if not, it runs the onboarding before normal conversation.
@@ -600,7 +600,6 @@ The onboarding scripts go in each persona's markdown under a `## Onboarding (new
 1. What's your name?
 2. What's your relation to the student?
 3. What do you most want to know about?
-4. Do you prefer brief or detailed answers?
 
 Sally asks casually. avatar2 (dog persona) asks with R-prepend dog-speak. Each persona asks in their own style. Same info collected, different delivery.
 

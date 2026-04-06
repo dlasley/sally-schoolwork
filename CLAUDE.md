@@ -39,3 +39,11 @@ lk agent logs                                     # Tail runtime logs
 **Use `start` not `dev` for debugging.** `uv run python src/agent.py start` produces full JSON logs in the terminal. The `dev` command uses a file watcher that spawns child processes whose logs may not appear. Always kill orphaned multiprocessing workers before restarting: `ps aux | grep "agent.py\|multiprocessing" | grep -v grep | awk '{print $2}' | xargs kill 2>/dev/null`.
 
 **Follow the live testing protocol and coding practices in AGENTS.md.** The "Testing" section contains a mandatory pre-session checklist and coding rules for external service calls. These exist because silent failures in remote calls and orphaned processes have caused repeated multi-hour debugging sessions.
+
+**Class list is dynamic, not hardcoded.** The class list in the LLM's context comes from the rolling index at session start (via `_build_data_context()`). There is no static class list in `base.md` — it was removed to avoid conflicting with the dynamic source. If classes change, the agent picks them up automatically from snapshot data. Teacher names are also dynamic via tools.
+
+## Progress and planning
+
+**`docs/PROGRESS.md` is the single living document** for both progress tracking and forward-looking plans. Update it before commits and during long sessions per the global CLAUDE.md directive. When completing or modifying a planned feature, update the relevant section in PROGRESS.md.
+
+**`docs/PLAN.md` is a historical planning document** from initial development. Do not update it with new plans — use PROGRESS.md instead. PLAN.md is kept for reference on original design intent and provider research.

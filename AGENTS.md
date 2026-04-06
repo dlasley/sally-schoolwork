@@ -8,7 +8,7 @@ This Python project uses the `uv` package manager. Always use `uv` to install de
 
 ### Architecture
 
-- **Tools do the analysis, LLM narrates.** 16 `@function_tool` methods call deterministic Python in `src/data/analysis.py`. The LLM never sees raw JSON — it receives pre-computed human-readable summaries.
+- **Tools do the analysis, LLM narrates.** 17 `@function_tool` methods call deterministic Python in `src/data/analysis.py`. The LLM never sees raw JSON — it receives pre-computed human-readable summaries.
 - **Local data, not API.** The `table-mutation-data` repo is cloned at prewarm and git-pulled per session. All snapshot reads are filesystem I/O.
 - **Browser navigation.** Class-specific tools auto-navigate the browser via LiveKit RPC as a side effect. Aggregate tools (list_classes, get_recent_changes, get_grade_trend) do not navigate.
 - **Persona inheritance.** `personas/base.md` (shared, templated) is concatenated with a persona-specific `persona.md` in a subdirectory at load time. `config.json` (committed) defines provider choices; `config.local.json` (gitignored) holds real names and service IDs. New personas: copy `personas/example/`, customize, add config entry.
@@ -19,7 +19,7 @@ This Python project uses the `uv` package manager. Always use `uv` to install de
 
 ### Key files
 
-- `src/agent.py` — Entrypoint. Persona loading, 16 `@function_tool` methods, `resolve_relative_date()` standalone date math, `_navigate_browser` RPC helper, `SessionData` with `SnapshotReader` + `UserStore`, prewarm (clones data repo), session init (git pull, profile check, onboarding, avatar, TTS), session end summary callback. All remote calls wrapped with `ServiceHealth`.
+- `src/agent.py` — Entrypoint. Persona loading, 17 `@function_tool` methods, `resolve_relative_date()` standalone date math, `_navigate_browser` RPC helper, `SessionData` with `SnapshotReader` + `UserStore`, prewarm (clones data repo), session init (git pull, profile check, onboarding, avatar, TTS), session end summary callback. All remote calls wrapped with `ServiceHealth`.
 - `src/service_health.py` — Unified service health monitor. Tier-based degradation (CRITICAL/IMPORTANT/OPTIONAL), sync/async call wrappers with timeout, session start gating, LLM context injection for degraded services.
 - `src/data/analysis.py` — Deterministic analysis: diff, summarize, trends, flags, categories, ungraded assignments. All return human-readable strings.
 - `src/data/snapshot_reader.py` — Reads JSON snapshots from local clone. Fuzzy class name resolution via `resolve_slug()`.
@@ -32,7 +32,7 @@ This Python project uses the `uv` package manager. Always use `uv` to install de
 - `personas/example/persona.md` — Template for creating new personas (committed).
 - `supabase/schema.sql` — Consolidated database schema (user_profiles, session_history, session_messages).
 - `tests/test_agent.py` — 11 agent behavior tests using `mock_tools` and `judge()` (requires LLM API).
-- `tests/test_analysis.py` — 55 data layer unit tests using temp directories with synthetic snapshots.
+- `tests/test_analysis.py` — 54 data layer unit tests using temp directories with synthetic snapshots.
 - `tests/test_navigation.py` — 31 tests: payloads, date validation, date arithmetic, tool alignment, format helpers, placeholder summary detection.
 - `tests/test_user_store.py` — 22 UserStore tests with mocked Supabase client.
 - `tests/test_service_health.py` — 25 service health tests: registration, status tracking, gating, sync/async wrappers, timeout.

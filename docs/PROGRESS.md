@@ -94,7 +94,7 @@ Also suppressed hpack/httpcore/httpx/h2 DEBUG noise that was drowning out agent 
 - Navigation alignment: removed nav from aggregate tools
 - Session memory: context injection via instructions, structured topic extraction
 - Frontend: DayDetail useEffect, NavigationHandler cleanup, error state
-- 88 non-LLM tests across 4 test files + 11 LLM-dependent agent tests
+- 88 non-LLM tests across 4 test files + 11 LLM-dependent agent tests (later grew to 132 non-LLM)
 
 **New tools added:**
 - `get_overall_summary`: meta-tool aggregating all analysis for holistic questions
@@ -153,67 +153,63 @@ Testing was conducted across two browser devices (device `a4b54517` and `ab0b4d5
 - Phase 11: Persona management (completed — merged into PII scrub)
 - Phase 12: Avatar widget UI redesign
 
-## Uncommitted Changes (safe to commit)
-- `src/agent.py` — major refactor: extracted `resolve_relative_date()`, `_build_user_context()`, `_build_data_context()`, `_configure_tts()`, `_start_avatar()`, `_class_not_found()` helper. ServiceHealth integration. Dynamic class keywords from rolling index. `turn_handling` deprecation fix. Greeting name interpolation. Session history context strengthening. Suppressed hpack/httpcore debug noise. Deferred summarization, get_ungraded_assignments tool, synchronous close handler.
-- `src/service_health.py` — new: unified service health monitor (CRITICAL/IMPORTANT/OPTIONAL tiers)
-- `src/data/analysis.py` — `get_ungraded_assignments(reader, slug)`: finds assignments with no score entered, sorted by point value
-- `src/data/user_store.py` — `save_session` optional `session_id` param; `update_session_summary` method; removed dead `communication_preferences` parameter and formatting
-- `supabase/schema.sql` — `session_id text unique` column added to `session_history`
-- `supabase/migrations/001_session_history_session_id.sql` — migration (already run on live DB)
-- `personas/base.md` — onboarding CRITICAL RULE, Q2 example, show_capabilities instruction, bullet point rule, guardrail redirect
-- `pyproject.toml` — added openai extra with comment (needed for AsyncOpenAI in deferred summarization)
-- `tests/test_navigation.py` — 12 new tests (resolve_date arithmetic, placeholder summary, alignment update)
-- `tests/test_analysis.py` — 4 new tests (get_ungraded_assignments)
-- `tests/test_user_store.py` — 3 new tests (session_id, update_session_summary); removed communication_preferences from test data
-- `tests/test_service_health.py` — new: 25 tests for service health
-- `.env.local` — OPENAI_API_KEY added (required for deferred summarization)
+## Uncommitted Changes
+None — all changes committed as of 2026-04-05 (commit `7f5c9fa`).
 
 ## Known Issues
 
-### CONFIRMED RESOLVED
-- **session_history not writing**: `session.once("close", ...)` synchronous close handler confirmed working -- rows written per-session on disconnect
-- **Deferred summarization**: `asyncio.to_thread()` wrapping confirmed working -- session 2648f374 received LLM-generated summary
-- **Cloud agent blocking local dev**: CA_YAj8JF77hrEM deleted. Local dev worker receives dispatches correctly.
+### Open — needs investigation
+- **Session history not injected for returning users**: Observed in session a514363f — "What did we talk about last time?" returned "I don't have access to your previous conversations" despite session_history rows existing in Supabase. Root cause unknown.
 
-### OpenAI STT incompatible with MultilingualModel (attempted, reverted)
-**Symptom**: Greeting delivered successfully; user speech transcribed (session_messages written) but agent never responded. MultilingualModel turn detection did not trigger.
-**Root cause hypothesis**: `openai_plugins.STT(model="gpt-4o-transcribe")` does not provide the streaming ASR tokens or confidence metadata that MultilingualModel expects for end-of-turn detection.
-**Also observed**: One session (82810dd9) produced no greeting and no session_history row -- silent exception during entrypoint, likely from a transient STT init failure.
-**Status**: Reverted to `inference.STT(model="deepgram/nova-3", language="multi")`. If direct OpenAI STT is needed in future, use a VAD-only turn detector (`silero.VAD` without MultilingualModel) or investigate whether `gpt-4o-transcribe` supports the expected streaming format.
-**Deepgram 429s**: Were caused by rapid-fire test sessions, not regular usage. Not a concern for normal use. Alternative: `inference.STT(model="assemblyai/u3-rt-pro")` if rate limits recur.
+### Open — fixes in code, need clean retest
+Note: the 2026-04-04 testing session may have tested pre-fix code (agent not restarted between changes). All items below need retesting with a confirmed fresh agent restart.
 
-### Onboarding issues (fixes in code, testing status uncertain)
-Note: because the local dev agent may not have been restarted between code changes during the 2026-04-04 testing session, it is unclear which sessions tested the pre-fix or post-fix code. All items below need clean retesting with a confirmed fresh agent restart.
-- **Q2+Q3 batching**: Observed in sessions 903c8c97 (Q2+Q3 in one response), 6ed793c3, d2030c64. Fix in current base.md: CRITICAL RULE + WRONG/RIGHT Q2 example. Status: needs clean retest.
-- **Q4 still asked**: Observed in sessions 6ed793c3, 78950ee3, 6498e922 (asked "brief or detailed?" after Q3). Fix: removed `communication_preferences` from `save_user_profile` tool params. Status: needs clean retest.
-- **show_capabilities not called after onboarding**: Observed in session 903c8c97. Worked in session 6498e922 (help page opened). Fix in current base.md explains tool opens browser. Status: partially working, needs clean retest.
-- **Capabilities shown as bullet list**: Observed in sessions 6ed793c3, d2030c64 -- Sally listed capabilities as bullets before/during onboarding instead of speaking naturally.
+- **Onboarding Q2+Q3 batching**: Fix: CRITICAL RULE + WRONG/RIGHT Q2 example in base.md.
+- **Onboarding Q4 still asked**: Fix: removed `communication_preferences` from `save_user_profile` tool.
+- **show_capabilities not called after onboarding**: Fix in base.md. Partially worked in session 6498e922.
+- **Capabilities shown as bullet list**: Fix: WRONG/RIGHT rule in base.md.
+- **"Last Friday" resolved to wrong date**: Fix: reference date extraction in `resolve_relative_date()`. Worked in session 6498e922.
+- **"The Friday before" broken**: Fix: "before" keyword adds `extra_weeks` offset.
+- **Ungraded assignments false negative**: Fix: `get_ungraded_assignments` tool added.
+- **Bullet points from tool output**: Fix: WRONG/RIGHT rule in base.md.
+- **Out-of-scope school questions**: Fix: guardrail redirect in base.md.
+- **Returning user greeting doesn't use name**: Fix: string interpolation into greeting.
 
-### Date resolution issues (fixes in code, testing status uncertain)
-- **"Last Friday" resolved to wrong date**: Observed in sessions af9beedf (navigated to April 4th Saturday), 6ed793c3/d2030c64/78950ee3 (resolved to March 27th instead of April 3rd). Worked correctly in session 6498e922. Fix: reference date extraction in resolve_date. Status: worked in at least one session, needs clean retest.
-- **"The Friday before" broken**: Observed in session 6498e922 (both dates resolved to April 3rd). Fix: "before" keyword adds extra_weeks offset. Status: needs clean retest.
+### Open — minor / accepted
+- **Hedra avatar returns 500 intermittently**: Gracefully handled by ServiceHealth.
+- **Session memory race condition**: Close handler write may not complete before next session queries. Only affects back-to-back sessions (<10s apart).
+- **GPT-4.1 follows persona catchphrases ~70%**: Known LLM instruction-following limitation.
+- **`.gitignore` and `lk agent deploy` tension**: Gitignored files excluded from deploy build context. Workaround: env var fallbacks.
+- **STT transcription accuracy**: "Dave" transcribed as "Dev". STT-level issue, not agent logic.
 
-### Tool behavior issues (fixes in code, testing status uncertain)
-- **Ungraded assignments false negative**: Observed in session 903c8c97 -- agent said "no incomplete assignments" when English had multiple ungraded items. User had to push back three times before agent acknowledged. Fix: `get_ungraded_assignments` tool added in current agent.py. Status: needs clean retest.
-- **Bullet points from tool output**: Observed in sessions af9beedf, 6ed793c3, 903c8c97. Fix: WRONG/RIGHT rule in current base.md. Status: needs clean retest.
-- **Out-of-scope school questions**: Observed in session 903c8c97 ("How do they detect grades?" got a long lecture). Fix: guardrail redirect in current base.md. Status: needs clean retest.
+### Open — architectural debt (identified 2026-04-05 review)
+- **`SnapshotReader.refresh()` swallows exceptions**: `refresh()` catches errors internally without re-raising, so `ServiceHealth` marks git as healthy on failed pulls. Needs fix.
+- **Deferred summarization uses separate OpenAI client**: `_upgrade_session_summary` calls `AsyncOpenAI` directly instead of going through LiveKit inference gateway. Two auth paths, two billing channels. Document for later consolidation.
+- **Synchronous close handler is fragile**: Blocking HTTP call in close event may not complete if Supabase is slow. Document for later hardening.
+- **RPC navigation failure invisible to LLM**: `_navigate_browser` is fire-and-forget. If frontend disconnects, agent continues referencing browser. Assess LOE for RPC failure awareness.
+- **Data freshness not checked**: No warning when latest snapshot is stale (>36 hours). Low priority given daily scrapes.
+- **Token endpoint has no rate limiting or auth**: `/api/livekit-token` on Vercel gives anyone a room token. Needs origin check/rate limit.
+- **No Supabase RLS policies**: Service key used for all operations. Needs RLS policies added.
+- **`agent.py` is a 1,138-line monolith**: Needs decomposition — persona loading, deferred summarization, date resolution, tool boilerplate extraction.
+- **Tool method boilerplate**: 17 tools repeat slug-resolve-navigate-analyze pattern (~255 lines). Needs extraction to decorator or base method.
+- **RPC protocol undocumented**: `navigateTo` payload contract between agent and frontend is implicit. Needs documentation and contract test.
+- **Snapshot JSON schema undocumented**: Assignment/metadata schema between scraper and agent is implicit. Needs schema doc and contract test.
 
-### Session history / returning user issues
-- **Session history not injected for returning users**: Observed in session a514363f -- "What did we talk about last time?" returned "I don't have access to your previous conversations" despite session_history rows existing in Supabase. Root cause unknown. Needs investigation.
-- **Returning user greeting doesn't use name**: Observed in session eabe204a. `session.say(greeting)` hardcoded. Attempted fix via `generate_reply` caused regression. Alternative: string interpolation into greeting.
-
-### Minor
-- **Hedra avatar returns 500 intermittently**: Gracefully handled.
-- **Session memory race condition**: If new session starts within ~10 seconds of previous session ending, close handler write may not complete before new session queries recent sessions. Low priority -- only affects back-to-back sessions.
-- **GPT-4.1 follows persona catchphrases ~70%**: Known.
-- **`.gitignore` and `lk agent deploy` tension**: Gitignored files excluded from deploy build context. Workaround: env var fallbacks. Needs systematic review.
-- **STT transcription accuracy**: "Dave" transcribed as "Dev" in session d2030c64. User had to spell it out. STT-level issue, not agent logic.
+### Resolved (historical)
+- **session_history not writing**: Close handler confirmed working — rows written per-session.
+- **Deferred summarization**: `asyncio.to_thread()` wrapping confirmed working.
+- **Cloud agent blocking local dev**: CA_YAj8JF77hrEM deleted.
+- **Dispatch routing**: Orphaned multiprocessing workers identified and documented in live testing protocol.
+- **OpenAI STT incompatible with MultilingualModel**: Reverted to Deepgram. If needed in future, use VAD-only turn detector.
+- **Deepgram 429s**: Caused by rapid-fire test sessions, not regular usage.
+- **LemonSlice credits exhausted**: Temporary — credits topped off.
+- **Unified service error layer**: Implemented as `src/service_health.py` (2026-04-05).
 
 ## Architecture
 
 ```
 sally-schoolwork (this repo) — Agent backend
-  src/agent.py             — 15 tools, persona loading, session lifecycle, navigation
+  src/agent.py             — 17 tools, persona loading, session lifecycle, navigation
   src/data/analysis.py     — Deterministic analysis (tools call these, LLM narrates)
   src/data/snapshot_reader.py — Local filesystem reader for table-mutation-data clone
   src/data/user_store.py   — Supabase client for profiles and session memory
@@ -224,7 +220,7 @@ sally-schoolwork (this repo) — Agent backend
   personas/<pseudonym>/persona.md — Per-persona voice style, catchphrases (tracked)
   personas/example/persona.md — Template for new personas (committed)
   supabase/schema.sql      — Consolidated database schema
-  tests/                   — 88 non-LLM tests + 11 LLM-dependent agent tests
+  tests/                   — 132 non-LLM tests + 11 LLM-dependent agent tests
 
 table-mutation-tracker (branch feature/livekit-agent-widget)
   frontend/components/AgentWidget.tsx  — Widget, RPC navigation, device_id
@@ -238,14 +234,27 @@ External services:
 ```
 
 ## Next Steps
-1. **Resolve dispatch routing issue** — kill all agent processes, wait 30s, restart, test avatar1 (Hedra) only. If dispatches still don't reach the terminal process, investigate LiveKit Cloud worker registration state.
-2. **Test behavior fixes** (onboarding, guardrails, bullets, ungraded tool) — all code fixes in place, need clean live test with confirmed-working dispatch routing.
-3. **Commit outstanding changes** — agent.py, base.md, analysis.py, user_store.py, supabase files, new tests
-4. **Unified service error layer** — see [SERVICE_LAYER_PLAN.md](SERVICE_LAYER_PLAN.md). Wrap all remote calls (STT, LLM, TTS, avatar, Supabase, git, RPC) with consistent health tracking, tier-based degradation, and session start gating. Priority: before next deploy.
-5. **Re-deploy to LiveKit Cloud** — deleted CA_YAj8JF77hrEM; redeploy with new code + service layer for persistent non-dev usage
-6. **Top off LemonSlice credits** — then test avatar2/avatar3 personas
-7. Phase 6c: Cartoon self-portrait persona + LemonSlice + provider dispatch refactor
-8. Phase 9: Capacitor iOS build
+
+### High priority
+1. **Refactor `agent.py` monolith** — decompose into modules: persona loading, deferred summarization, date resolution, tool base class/decorator for boilerplate extraction.
+2. **Scrub PII from table-mutation-tracker CLAUDE.md** — real names and school name still present.
+3. **Clean retest of behavior fixes** — onboarding, guardrails, bullets, ungraded tool, date resolution. All code fixes are in place. Follow live testing protocol.
+
+### Medium priority
+4. **Fix `SnapshotReader.refresh()` exception swallowing** — re-raise errors so ServiceHealth can detect failed git pulls.
+5. **Document + test RPC protocol contract** — `navigateTo` payload between agent and frontend.
+6. **Document + test snapshot JSON schema contract** — assignment/metadata format between scraper and agent. Include integration test with sample fixture data.
+7. **Token endpoint security** — add rate limiting and origin check to `/api/livekit-token`.
+8. **Supabase RLS policies** — add Row-Level Security to user_profiles, session_history, session_messages.
+9. **Re-deploy to LiveKit Cloud** — redeploy with current code for persistent non-dev usage.
+
+### Lower priority
+10. **Data freshness warning** — check `scrape_timestamp` age, warn if >36 hours stale.
+11. **Consolidate deferred summarization LLM path** — route through LiveKit inference instead of direct OpenAI client.
+12. **Harden session close handler** — address potential for incomplete writes if Supabase is slow.
+13. **RPC failure awareness** — assess LOE for suppressing browser references when navigation RPC fails.
+14. Phase 9: Capacitor iOS build.
+15. Top off LemonSlice credits, test avatar2/avatar3 personas.
 
 ### Testing checklist (clean retest required)
 **Protocol**: restart `uv run python src/agent.py dev` before each test. Run `lk agent list` to confirm no cloud agent. Use a fresh device_id (clear localStorage) for onboarding tests.
