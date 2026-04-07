@@ -152,6 +152,16 @@ async def start_avatar(health: ServiceHealth, persona: dict, session, room) -> N
         avatar_id = persona["hedra_avatar_id"]
         avatar = hedra.AvatarSession(avatar_id=avatar_id)
         await health.check_service("avatar", avatar.start(session, room=room))
+    elif avatar_provider == "simli" and persona.get("simli_face_id"):
+        from livekit.plugins import simli
+
+        avatar = simli.AvatarSession(
+            simli_config=simli.SimliConfig(
+                api_key=os.getenv("SIMLI_API_KEY", ""),
+                face_id=persona["simli_face_id"],
+            ),
+        )
+        await health.check_service("avatar", avatar.start(session, room=room))
     elif avatar_provider == "lemonslice" and persona.get("lemonslice_image_url"):
         from livekit.plugins import lemonslice
 
@@ -256,3 +266,7 @@ def validate_api_keys(health: ServiceHealth, persona: dict) -> None:
         health.mark_failed("tts", "ELEVEN_API_KEY not set")
     else:
         health.mark_healthy("tts")
+
+    avatar_provider = persona.get("avatar_provider")
+    if avatar_provider == "simli" and not os.getenv("SIMLI_API_KEY"):
+        health.mark_failed("avatar", "SIMLI_API_KEY not set")

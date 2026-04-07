@@ -21,7 +21,14 @@
       "avatar_provider": "lemonslice",
       "tts_provider": "elevenlabs",
       "llm_temperature": 0.4
+    },
+    "demo": {
+      "instructions": "personas/demo/persona.md",
+      "greeting": "Hey! I'm Sally Schoolwork. Ask me about grades, assignments, or what's changed recently!",
+      "avatar_provider": "simli",
+      "tts_provider": "elevenlabs",
+      "llm_temperature": 0.4
     }
   },
-  "default": "avatar2"
+  "default": "demo"
 }

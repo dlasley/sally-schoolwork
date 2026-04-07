@@ -12,7 +12,7 @@ name = "agent-starter-python"
 version = "1.0.0"
 source = { editable = "." }
 dependencies = [
-    { name = "livekit-agents", extra = ["anthropic", "deepgram", "elevenlabs", "hedra", "images", "lemonslice", "silero", "turn-detector"] },
+    { name = "livekit-agents", extra = ["anthropic", "deepgram", "elevenlabs", "hedra", "images", "lemonslice", "silero", "simli", "turn-detector"] },
     { name = "livekit-plugins-noise-cancellation" },
     { name = "python-dotenv" },
     { name = "supabase" },
@@ -27,7 +27,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "livekit-agents", extras = ["anthropic", "deepgram", "elevenlabs", "hedra", "images", "lemonslice", "silero", "turn-detector"], specifier = "~=1.4" },
+    { name = "livekit-agents", extras = ["anthropic", "deepgram", "elevenlabs", "hedra", "images", "lemonslice", "silero", "simli", "turn-detector"], specifier = "~=1.4" },
     { name = "livekit-plugins-noise-cancellation", specifier = "~=0.2" },
     { name = "python-dotenv" },
     { name = "supabase", specifier = ">=2.28.3" },
@@ -1207,6 +1207,9 @@ lemonslice = [
 silero = [
     { name = "livekit-plugins-silero" },
 ]
+simli = [
+    { name = "livekit-plugins-simli" },
+]
 turn-detector = [
     { name = "livekit-plugins-turn-detector" },
 ]
@@ -1357,6 +1360,18 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/ab/fa/919320fd78a3a4a71c1d8bdb3b4c2152b8f8f62363154e0b6d6c7ac0585b/livekit_plugins_silero-1.5.1.tar.gz", hash = "sha256:9aa80867ea4c26181916cccb5d72e77e2f0d27a3408ac39cbfae508a62015629", size = 1955570, upload-time = "2026-03-23T22:52:28.519Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/f5/0e/7b13629d98ba0ca71babf3367ad936fdfb26694969bc01b0b12238f12d44/livekit_plugins_silero-1.5.1-py3-none-any.whl", hash = "sha256:3f6be6404e347ed55d03cd630b149a7421746b1dbb87a4e09dd13a2384a17ce3", size = 3903690, upload-time = "2026-03-23T22:52:27.141Z" },
+]
+
+[[package]]
+name = "livekit-plugins-simli"
+version = "1.5.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "livekit-agents" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/fd/2b/6ca5cbe822c9c5f5c310c45a63243816f67046c3c4b6cc4b6830868feac4/livekit_plugins_simli-1.5.1.tar.gz", hash = "sha256:f1ae98aaacc91f6b157ef9a483ac70e6843eae7260a6f4ec128ec5c76f3f6d50", size = 5083, upload-time = "2026-03-23T22:52:31.27Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/95/ad/4924c6e7774c4ac10431844e991587c80cea8a2ecc6ca046b67aeb3de889/livekit_plugins_simli-1.5.1-py3-none-any.whl", hash = "sha256:7152b018ccb952f37bb8265caa71891e74d62b999b43770f3b6f85f9cdf0e683", size = 5186, upload-time = "2026-03-23T22:52:29.936Z" },
 ]
 
 [[package]]

@@ -248,6 +248,7 @@ External services:
 ### High priority
 1. ~~**Refactor `agent.py` monolith**~~ — DONE. Decomposed into 6 modules: agent.py (244 lines), assistant.py, session_lifecycle.py, persona.py, deferred_summary.py, date_resolution.py. Added `_resolve_class` helper.
 2. ~~**Scrub PII from table-mutation-tracker CLAUDE.md**~~ — VERIFIED CLEAN. No PII found in any tracked files. `private/` dir is gitignored.
+3. ~~**Public demo persona**~~ — DONE. New "demo" persona with Simli avatar (stock face) + ElevenLabs stock voice. Default persona for public use. Existing personas (avatar1/2/3) hidden behind triple-tap superuser gate in frontend widget.
 3. **Clean retest of behavior fixes** — onboarding, guardrails, bullets, ungraded tool, date resolution. All code fixes are in place. Follow live testing protocol.
 
 ### Medium priority

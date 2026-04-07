@@ -11,7 +11,7 @@ requires-python = ">=3.10, <3.15"
 dependencies = [
     # openai extra needed for AsyncOpenAI in deferred session summarization (_upgrade_session_summary)
     # Direct provider plugins bypass LiveKit inference gateway quota
-    "livekit-agents[anthropic,deepgram,elevenlabs,hedra,images,lemonslice,silero,turn-detector]~=1.4",
+    "livekit-agents[anthropic,deepgram,elevenlabs,hedra,images,lemonslice,silero,simli,turn-detector]~=1.4",
     "livekit-plugins-noise-cancellation~=0.2",
     "python-dotenv",
     "supabase>=2.28.3",
