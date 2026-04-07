@@ -56,3 +56,22 @@ create trigger user_profiles_updated_at
   before update on user_profiles
   for each row
   execute function update_updated_at();
+
+-- Row-Level Security
+-- Agent uses anon key. Permissive policies allow all reads/writes
+-- (agent is the only client and needs cross-device access).
+-- No DELETE policies: data deletion only via FK cascade or service key.
+alter table user_profiles enable row level security;
+alter table session_history enable row level security;
+alter table session_messages enable row level security;
+
+create policy "anon_select_profiles" on user_profiles for select using (true);
+create policy "anon_insert_profiles" on user_profiles for insert with check (true);
+create policy "anon_update_profiles" on user_profiles for update using (true);
+
+create policy "anon_select_sessions" on session_history for select using (true);
+create policy "anon_insert_sessions" on session_history for insert with check (true);
+create policy "anon_update_sessions" on session_history for update using (true);
+
+create policy "anon_select_messages" on session_messages for select using (true);
+create policy "anon_insert_messages" on session_messages for insert with check (true);

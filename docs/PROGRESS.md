@@ -193,8 +193,8 @@ Fixes added to base.md. Will be tested alongside future deterministic changes.
 - **Synchronous close handler is fragile**: Blocking HTTP call in close event may not complete if Supabase is slow. Document for later hardening.
 - **RPC navigation failure invisible to LLM**: `_navigate_browser` is fire-and-forget. If frontend disconnects, agent continues referencing browser. Assess LOE for RPC failure awareness.
 - **Data freshness not checked**: No warning when latest snapshot is stale (>36 hours). Low priority given daily scrapes.
-- **Token endpoint has no rate limiting or auth**: `/api/livekit-token` on Vercel gives anyone a room token. Needs origin check/rate limit.
-- **No Supabase RLS policies**: Service key used for all operations. Needs RLS policies added.
+- ~~**Token endpoint has no rate limiting or auth**~~: RESOLVED. Added IP-based rate limiting (10 req/min per IP).
+- ~~**No Supabase RLS policies**~~: RESOLVED. RLS enabled, permissive policies for anon role, no DELETE via API.
 - ~~**`agent.py` is a 1,138-line monolith**~~: RESOLVED. Decomposed into 6 modules (agent.py now 244 lines).
 - ~~**Tool method boilerplate**~~: RESOLVED. Added `_resolve_class()` helper to Assistant class.
 - ~~**RPC protocol undocumented**~~: RESOLVED. Documented in `docs/CONTRACTS.md` with 7 contract tests.
@@ -255,8 +255,8 @@ External services:
 4. **Fix `SnapshotReader.refresh()` exception swallowing** — re-raise errors so ServiceHealth can detect failed git pulls.
 5. ~~**Document + test RPC protocol contract**~~ — DONE. `docs/CONTRACTS.md` + 7 contract tests in `test_navigation.py`. Cross-referenced in `table-mutation-tracker/LIVEKIT_AGENT.md`.
 6. ~~**Document + test snapshot JSON schema contract**~~ — DONE. `docs/CONTRACTS.md` + 5 contract tests in `test_navigation.py`.
-7. **Token endpoint security** — add rate limiting and origin check to `/api/livekit-token`.
-8. **Supabase RLS policies** — add Row-Level Security to user_profiles, session_history, session_messages.
+7. ~~**Token endpoint security**~~ — DONE. Added IP-based rate limiting (10 req/min) to `/api/livekit-token`.
+8. ~~**Supabase RLS policies**~~ — DONE. RLS enabled on all tables. Permissive policies for anon role (agent is only client). No DELETE policies — data deletion only via FK cascade or service key. Migration: `002_rls_policies.sql`.
 9. **Re-deploy to LiveKit Cloud** — redeploy with current code for persistent non-dev usage.
 
 ### Lower priority
