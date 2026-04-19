@@ -5,7 +5,7 @@
   "personas": {
     "example": {
       "elevenlabs_voice_id": null,
-      "hedra_avatar_id": null,
+      "simli_face_id": null,
       "lemonslice_image_url": null,
       "elevenlabs_speed": 0.85,
       "elevenlabs_stability": 0.5,

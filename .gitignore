@@ -41,6 +41,7 @@ supabase/.temp/
 # Claude Code
 .claude/settings.local.json
 .claude/worktrees/
+.claude/plans/
 
 # OpenAI Codex
 .codex/config.local.toml

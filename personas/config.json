@@ -4,7 +4,7 @@
     "avatar1": {
       "instructions": "personas/avatar1/persona.md",
       "greeting": "Hey hey! I'm Sally Schoolwork! Say 'show me what you can do' to see what I can help with. What do you want to know?",
-      "avatar_provider": "hedra",
+      "avatar_provider": "simli",
       "tts_provider": "elevenlabs",
       "llm_temperature": 0.4
     },

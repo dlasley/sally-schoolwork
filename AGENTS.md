@@ -2,15 +2,29 @@
 
 A LiveKit voice/text agent ("Sally") that answers questions about a student's grades and assignments. The user is the student's parent. The agent reads snapshot data from a local clone of `dlasley/table-mutation-data` (private repo of daily SIS portal scrapes). The frontend widget lives in a separate repo (`table-mutation-tracker`, branch `feature/livekit-agent-widget`).
 
+## Getting started
+
+**New to this project?** Start here:
+1. Read the **Architecture** section below to understand the deterministic/nondeterministic boundary — it shapes where bugs live and how to debug.
+2. Skim **Key files** to learn what lives where.
+3. Check [PROGRESS.md](docs/PROGRESS.md) to see current work and blockers.
+4. For a deep-dive, [ARCHITECTURE.md](docs/ARCHITECTURE.md) has system diagrams, data flow, and failure modes.
+5. For dev setup, see **Environment variables** and **Commands** sections.
+
+**Key mental model:** Tools do deterministic analysis in Python, the LLM narrates the results. If data is wrong, look at `analysis.py`. If phrasing is wrong, look at `personas/base.md`. This splits debugging in half.
+
 ## Project structure
 
 This Python project uses the `uv` package manager. Always use `uv` to install dependencies, run the agent, and run tests.
 
 ### Architecture
 
+**The deterministic/nondeterministic boundary:** User voice → Deepgram (STT, nondeterministic) → Claude Sonnet 4.6 (tool selection, nondeterministic) → `analysis.py` (deterministic, unit-tested) → human-readable string → Claude (narration, nondeterministic) → TTS (nondeterministic) → audio. If data is wrong, the bug is in `analysis.py`. If phrasing is wrong, it's in `personas/base.md` instructions. If the wrong tool was called, it's in tool descriptions.
+
 - **Tools do the analysis, LLM narrates.** 17 `@function_tool` methods call deterministic Python in `src/data/analysis.py`. The LLM never sees raw JSON — it receives pre-computed human-readable summaries.
+- **Tool design rule: class-specific vs. aggregate.** Class-specific tools (get_class_summary, get_class_ungraded, show_class_changes) auto-navigate the browser via RPC as a side effect. Aggregate tools (list_classes, get_recent_changes, get_grade_trend) do not navigate because they don't map to a single page. Maintain this distinction when adding tools.
 - **Local data, not API.** The `table-mutation-data` repo is cloned at prewarm and git-pulled per session. All snapshot reads are filesystem I/O.
-- **Browser navigation.** Class-specific tools auto-navigate the browser via LiveKit RPC as a side effect. Aggregate tools (list_classes, get_recent_changes, get_grade_trend) do not navigate.
+- **Browser navigation.** Class-specific tools trigger RPC to frontend for automatic navigation. No explicit "show me" step needed.
 - **Persona inheritance.** `personas/base.md` (shared, templated) is concatenated with a persona-specific `persona.md` in a subdirectory at load time. `config.json` (committed) defines provider choices; `config.local.json` (gitignored) holds real names and service IDs. New personas: copy `personas/example/`, customize, add config entry.
 - **Avatar and voice are optional.** If avatar/voice IDs are null in `config.local.json`, the agent falls back to Cartesia TTS and no avatar.
 - **User profiles.** Stored in Supabase. New users go through a persona-specific onboarding flow. Returning users get profile and session history injected into instructions.
@@ -44,13 +58,17 @@ This Python project uses the `uv` package manager. Always use `uv` to install de
 
 ### Environment variables
 
-Set in `.env.local` (local) and as LiveKit Cloud secrets (deployed):
+**Local development (`.env.local`):** Create this file from `.env.example`. It's gitignored and holds personal API keys and student names. Also create `personas/config.local.json` (gitignored) with real student/school names and service IDs. See [ARCHITECTURE.md](docs/ARCHITECTURE.md#persona-config-architecture) for the config split rationale.
 
+**Deployed (LiveKit Cloud secrets):** When deploying, set these as Cloud environment secrets. The `load_persona()` function falls back to env vars when `config.local.json` doesn't exist.
+
+**Variables:**
 - `LIVEKIT_URL`, `LIVEKIT_API_KEY`, `LIVEKIT_API_SECRET` — LiveKit Cloud
 - `DATA_REPO_URL` — Git URL for table-mutation-data (include token for private repo)
 - `HEDRA_API_KEY` — Hedra avatar
 - `ELEVEN_API_KEY` — ElevenLabs TTS/voice cloning
 - `SUPABASE_URL`, `SUPABASE_KEY` — Supabase (user profiles and session memory)
+- `ELEVENLABS_VOICE_ID`, `HEDRA_AVATAR_ID` — Optional, per-persona deployment overrides (set as Cloud secrets)
 
 ### Deployment
 
@@ -125,9 +143,11 @@ Voice AI agents are highly sensitive to excessive latency. For this reason, it's
 
 ## Testing
 
-When possible, add tests for agent behavior. Read the [documentation](https://docs.livekit.io/agents/start/testing/), and refer to existing tests in the `tests/` directory.  Run tests with `uv run pytest`.
+**Philosophy:** The deterministic layer (`analysis.py`, `snapshot_reader`, date resolution, service health) is unit-tested. The nondeterministic layer (LLM tool selection, narration, STT, TTS) is tested via live sessions or mocked in `test_agent.py` using `judge()`. Always test at the boundary you're changing — don't guess at LLM behavior, and don't ship analysis logic without test coverage.
 
-Important: When modifying core agent behavior such as instructions, tool descriptions, and tasks/workflows/handoffs, never just guess what will work. Always use test-driven development (TDD) and begin by writing tests for the desired behavior. For instance, if you're planning to add a new tool, write one or more tests for the tool's behavior, then iterate on the tool until the tests pass correctly. This will ensure you are able to produce a working, reliable agent for the user.
+**Test-driven development (TDD):** When modifying core agent behavior such as tool descriptions, instructions, and tasks, write failing tests *first*, then iterate until they pass. For new tools, write tests for both the happy path and the failure path (test degradation via `ServiceHealth.mark_failed()`). This ensures reliable agent behavior before live testing.
+
+**Running tests:** Use `uv run pytest` for all tests, or run subsets by category (see Commands section). Read the [LiveKit testing documentation](https://docs.livekit.io/agents/start/testing/) for deeper guidance and refer to existing tests in the `tests/` directory.
 
 ### Live session testing protocol
 

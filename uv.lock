@@ -12,7 +12,7 @@ name = "agent-starter-python"
 version = "1.0.0"
 source = { editable = "." }
 dependencies = [
-    { name = "livekit-agents", extra = ["anthropic", "deepgram", "elevenlabs", "hedra", "images", "lemonslice", "silero", "simli", "turn-detector"] },
+    { name = "livekit-agents", extra = ["anthropic", "deepgram", "elevenlabs", "images", "lemonslice", "silero", "simli", "turn-detector"] },
     { name = "livekit-plugins-noise-cancellation" },
     { name = "python-dotenv" },
     { name = "supabase" },
@@ -27,7 +27,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "livekit-agents", extras = ["anthropic", "deepgram", "elevenlabs", "hedra", "images", "lemonslice", "silero", "simli", "turn-detector"], specifier = "~=1.4" },
+    { name = "livekit-agents", extras = ["anthropic", "deepgram", "elevenlabs", "images", "lemonslice", "silero", "simli", "turn-detector"], specifier = "~=1.4" },
     { name = "livekit-plugins-noise-cancellation", specifier = "~=0.2" },
     { name = "python-dotenv" },
     { name = "supabase", specifier = ">=2.28.3" },
@@ -1195,9 +1195,6 @@ deepgram = [
 elevenlabs = [
     { name = "livekit-plugins-elevenlabs" },
 ]
-hedra = [
-    { name = "livekit-plugins-hedra" },
-]
 images = [
     { name = "pillow" },
 ]
@@ -1305,18 +1302,6 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/3f/2a/25730347159549b989fb5aa2db9be77510e3d0aa07cecd36ca9b15cd07e9/livekit_plugins_elevenlabs-1.5.1.tar.gz", hash = "sha256:d1ec773d4471230268de738de74ac89b9a5a007c29169c6ed59fb5021f0b5ff1", size = 17181, upload-time = "2026-03-23T22:51:39.102Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/a2/78/a168c36a878f47e7b8f998a6a022953781344284080f835cdd9d18df001e/livekit_plugins_elevenlabs-1.5.1-py3-none-any.whl", hash = "sha256:4ed94a6a84b515000e6f6c5ff04eb949c3bee8fec9071c788a8300b3b7eacf1b", size = 19886, upload-time = "2026-03-23T22:51:38.198Z" },
-]
-
-[[package]]
-name = "livekit-plugins-hedra"
-version = "1.5.1"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "livekit-agents" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/84/29/0c182b907bf81077c39c7deafeb29576a4c45f470079822bc15c173839d8/livekit_plugins_hedra-1.5.1.tar.gz", hash = "sha256:73d3119ba3f37f088e9da2aea65ce16c3309f4d883244b0e6211416772681209", size = 5135, upload-time = "2026-03-23T22:51:53.681Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/bc/67/1058df9805bd32297bbe70edddaab3ba145a4fab5563fd4b394620191b6a/livekit_plugins_hedra-1.5.1-py3-none-any.whl", hash = "sha256:02b95e8d7ba5def91510375b2f00f4b1f7456591d511920459a28a88bdac70ae", size = 5181, upload-time = "2026-03-23T22:51:52.892Z" },
 ]
 
 [[package]]

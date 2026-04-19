@@ -43,7 +43,7 @@ def load_persona(name: str | None = None) -> dict:
     # These are set as LiveKit Cloud secrets for deployment
     env_fallbacks = {
         "elevenlabs_voice_id": os.getenv("ELEVENLABS_VOICE_ID"),
-        "hedra_avatar_id": os.getenv("HEDRA_AVATAR_ID"),
+        "simli_face_id": os.getenv("SIMLI_FACE_ID"),
         "lemonslice_image_url": os.getenv("LEMONSLICE_IMAGE_URL"),
         "elevenlabs_speed": os.getenv("ELEVENLABS_SPEED"),
         "elevenlabs_stability": os.getenv("ELEVENLABS_STABILITY"),
