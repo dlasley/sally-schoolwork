@@ -19,9 +19,9 @@ flowchart TB
 
     subgraph LK["LiveKit Cloud (managed)"]
         Room["WebRTC Room\nmedia routing"]
-        STT["Deepgram Nova 3\nSTT via inference gateway"]
-        LLM["Claude Sonnet 4.6\nLLM via inference gateway"]
-        TTS_LK["Cartesia sonic-3\ndefault TTS"]
+        STT["Deepgram Nova 3\nSTT (direct plugin)"]
+        LLM["Claude Sonnet 4.6\nLLM (direct plugin)"]
+        TTS_LK["Cartesia sonic-3\nfallback TTS"]
     end
 
     subgraph Agent["Agent Worker (sally-schoolwork)"]
@@ -37,7 +37,7 @@ flowchart TB
 
     subgraph External["External Services (managed)"]
         EL["ElevenLabs\nvoice clone TTS"]
-        Hedra["Hedra\nphotorealistic avatar"]
+        Simli["Simli\nphotorealistic avatar"]
         Lemon["LemonSlice\ncartoon avatar"]
         Supa["Supabase\nuser_profiles\nsession_history\nsession_messages"]
         Anth["Anthropic (direct)\nClaude Haiku 4.5\ndeferred summarization"]
@@ -86,9 +86,9 @@ flowchart TB
     Room -->|"audio + video"| Widget
 
     %% Avatar
-    MyAgent -.->|"if configured"| Hedra
+    MyAgent -.->|"if configured"| Simli
     MyAgent -.->|"if configured"| Lemon
-    Hedra -->|"video track"| Room
+    Simli -->|"video track"| Room
     Lemon -->|"video track"| Room
 
     %% RPC navigation
@@ -115,7 +115,7 @@ flowchart TB
     style LLM fill:#ffe0b2,color:#000
     style TTS_LK fill:#ffe0b2,color:#000
     style EL fill:#ffe0b2,color:#000
-    style Hedra fill:#bbdefb,color:#000
+    style Simli fill:#bbdefb,color:#000
     style Lemon fill:#bbdefb,color:#000
     style Supa fill:#bbdefb,color:#000
     style Anth fill:#ffe0b2,color:#000
@@ -170,14 +170,14 @@ sequenceDiagram
 
 | Runtime | Process | Repo | What runs there |
 |---------|---------|------|----------------|
-| **LiveKit Cloud** | Room server | (managed) | WebRTC room, media routing, agent dispatch. STT/LLM/TTS now use direct provider plugins (not inference gateway). |
-| **Deepgram** | STT service | (managed) | Speech-to-text via LiveKit inference gateway. Rate-limited (429s on rapid reconnects). |
+| **LiveKit Cloud** | Room server | (managed) | WebRTC room, media routing, agent dispatch. STT/LLM and ElevenLabs TTS use direct provider plugins; Cartesia TTS (fallback) still routes via LiveKit inference. |
+| **Deepgram** | STT service | (managed) | Speech-to-text via direct `deepgram.STT` plugin. Rate-limited (429s on rapid reconnects). |
 | **Anthropic** | LLM service | (managed) | Claude Sonnet 4.6 for agent conversation (direct plugin). Claude Haiku 4.5 for deferred summarization (direct AsyncAnthropic call). |
 | **ElevenLabs** | TTS service | (managed) | Voice cloning + TTS when persona uses `tts_provider: "elevenlabs"`. Voice settings (stability, similarity, speed) in persona config. |
-| **Cartesia** | TTS service | (managed) | Default TTS via LiveKit inference gateway. Used when no ElevenLabs voice ID configured. |
+| **Cartesia** | TTS service | (managed) | Fallback TTS via LiveKit inference gateway. Used when no ElevenLabs voice ID configured. |
 | **Agent worker** | Python (`agent.py start`) | sally-schoolwork | `my_agent()`, 17 `@function_tool` methods, `ServiceHealth`, persona loading, Supabase calls, git pull, close handler. |
-| **Hedra** | Avatar service | (managed) | Photorealistic lip-synced video from headshot (512x512). Published as LiveKit video track. |
-| **LemonSlice** | Avatar service | (managed) | Cartoon/stylized avatar (368x560). Published as LiveKit video track. |
+| **Simli** | Avatar service | (managed) | Real-time lip-synced video from face ID. Published as LiveKit video track. Used by avatar1 + demo personas. |
+| **LemonSlice** | Avatar service | (managed) | Cartoon/stylized avatar (368x560). Published as LiveKit video track. Used by avatar2 + avatar3 personas. |
 | **Supabase** | Hosted Postgres | (managed) | `user_profiles`, `session_history`, `session_messages` tables. |
 | **GitHub** | Git repo | table-mutation-data | Snapshot JSON files, rolling index. Written by n8n pipeline. Cloned by agent at prewarm, pulled per session. |
 | **Vercel** | Next.js SSR | table-mutation-tracker | Calendar UI, diff views, AgentWidget, NavigationHandler, `/api/livekit-token`. |
@@ -214,7 +214,7 @@ sequenceDiagram
 | **Deepgram STT** | Transcription accuracy | Audio quality, accent | Mishears ("Dave" → "Dev"), 429 rate limit |
 | **ElevenLabs TTS** | Prosody, pacing, voice fidelity | Voice settings in persona config | Auth failure, rate limit, invalid voice ID |
 | **Cartesia TTS** | Audio rendering | LiveKit inference gateway | Less variable but still nondeterministic |
-| **Hedra avatar** | Lip-sync quality, video rendering | Headshot quality | 500 errors (intermittent, gracefully handled) |
+| **Simli avatar** | Lip-sync quality, video rendering | Face ID, source image | API errors (gracefully handled, voice-only fallback) |
 | **LemonSlice avatar** | Animation quality | Image URL, agent_prompt | Credit exhaustion, API errors |
 | **Deferred summarization** | LLM-generated session summary text | Transcript content | Background task, may fail silently |
 
@@ -264,7 +264,7 @@ Real failures from 2026-04-04/05 testing sessions, mapped to components:
 | OpenAI STT incompatible with MultilingualModel | STT config (code) | Greeting plays, voice transcribed but turn detection never triggers | CRITICAL | Required live session to diagnose; no programmatic detection |
 | Supabase unreachable | Supabase (managed) | No profile loaded, no session history, no onboarding | IMPORTANT | `health.check_service_sync("supabase", ...)` returns None |
 | Git pull timeout | GitHub (managed) | Agent uses stale snapshot data | IMPORTANT | `health.check_service_sync("git", reader.refresh)` logs timeout |
-| Hedra 500 | Avatar (managed) | No video, falls back to BarVisualizer | OPTIONAL | `health.check_service("avatar", ...)` logs failure |
+| Simli API error | Avatar (managed) | No video, falls back to BarVisualizer | OPTIONAL | `health.check_service("avatar", ...)` logs failure |
 
 ## Data Lifecycle
 
@@ -324,8 +324,8 @@ personas/
 
 | Data | File | Why |
 |------|------|-----|
-| `avatar_provider: "hedra"` | config.json | Architecture choice, no secret |
-| `hedra_avatar_id: "710b89..."` | config.local.json | Service-specific ID, tied to personal account |
+| `avatar_provider: "simli"` | config.json | Architecture choice, no secret |
+| `simli_face_id: "abc123..."` | config.local.json | Service-specific ID, tied to personal account |
 | `tts_provider: "elevenlabs"` | config.json | Architecture choice |
 | `elevenlabs_voice_id: "UzmY..."` | config.local.json | Cloned voice ID, personal asset |
 | `elevenlabs_speed: 0.85` | config.local.json | Tuned to specific voice clone |
@@ -341,7 +341,7 @@ The split exists because this is a public repo with private data:
 
 1. **Public repo, private student.** The codebase is on public GitHub. Student name, school name, teacher names, and service account IDs must not be committed.
 2. **Persona design is public, persona identity is private.** The *character* of Sally Schoolwork (catchphrases, voice style, guardrails) is shareable. The *voice clone ID* and *avatar image* are personal assets.
-3. **Deployment uses env vars, not local files.** When deployed to LiveKit Cloud, `config.local.json` doesn't exist. `load_persona()` falls back to env vars (`ELEVENLABS_VOICE_ID`, `HEDRA_AVATAR_ID`, etc.) set as Cloud secrets.
+3. **Deployment uses env vars, not local files.** When deployed to LiveKit Cloud, `config.local.json` doesn't exist. `load_persona()` falls back to env vars (`ELEVENLABS_VOICE_ID`, `SIMLI_FACE_ID`, `LEMONSLICE_IMAGE_URL`, etc.) set as Cloud secrets.
 
 ### Considered alternatives
 
@@ -376,8 +376,9 @@ sally-schoolwork (agent)
   ├── Reads from → table-mutation-data (local git clone)
   ├── Writes to → Supabase (profiles, sessions, messages)
   ├── Sends RPC to → table-mutation-tracker frontend (navigateTo)
-  └── Uses → LiveKit Cloud (STT, LLM, TTS, room), Hedra/LemonSlice (avatar),
-             ElevenLabs (TTS), Anthropic direct (deferred summarization)
+  └── Uses → LiveKit Cloud (room, fallback Cartesia TTS), Deepgram (STT, direct),
+             Anthropic (Claude Sonnet 4.6 LLM + Claude Haiku 4.5 deferred summarization),
+             ElevenLabs (TTS), Simli/LemonSlice (avatar)
 
 table-mutation-data (data, no code)
   ├── Written by → n8n + scraper (table-mutation-tracker)
@@ -395,7 +396,7 @@ table-mutation-data (data, no code)
 
 **"The agent didn't respond after greeting"** → Deepgram 429 or STT failure. Check agent logs for `"failed to recognize speech"` or `"AgentSession is closing"`.
 
-**"No avatar video"** → Hedra 500 or LemonSlice credits. Check `health.summary()` in session close log.
+**"No avatar video"** → Simli API error or LemonSlice credits/auth. Check `health.summary()` in session close log.
 
 **"Browser didn't navigate"** → RPC failure. Check `_navigate_browser` debug log. Frontend may have disconnected.
 
