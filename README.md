@@ -6,7 +6,7 @@ A voice AI agent with a lip-synced avatar that answers questions about a student
 Built to demonstrate:
 
 - LiveKit Agents SDK with tool-calling, avatar, and voice pipeline integration
-- Multi-provider architecture: swappable avatar (Hedra, LemonSlice) and TTS (ElevenLabs, Cartesia) per persona
+- Multi-provider architecture: swappable avatar (Simli, LemonSlice) and TTS (ElevenLabs, Cartesia) per persona
 - Persona system with templated instructions, per-character catchphrases, and runtime config merging
 - Browser navigation via LiveKit RPC — agent tools auto-navigate the frontend as a side effect of data lookups
 - User profiles and session memory via Supabase — onboarding, incremental message persistence, LLM-generated session summaries
@@ -37,9 +37,9 @@ Frontend (separate repo: table-mutation-tracker)
   └── Calendar/diff UI — agent navigates to relevant views automatically
 ```
 
-**Voice pipeline:** Deepgram Nova 3 (STT) → GPT-4.1 (LLM) → ElevenLabs or Cartesia (TTS)
+**Voice pipeline:** Deepgram Nova 3 (STT, direct plugin) → Claude Sonnet 4.6 (LLM, direct plugin) → ElevenLabs (direct) or Cartesia (fallback via LiveKit inference)
 
-**Avatar:** Hedra (photorealistic from headshot, 512×512 lip-synced video) or LemonSlice (cartoon/stylized, 368×560). Published as a standard LiveKit video track.
+**Avatar:** Simli (real-time lip-synced video from face ID) or LemonSlice (cartoon/stylized, 368×560). Published as a standard LiveKit video track.
 
 **Data flow:** Agent clones a private GitHub repo of daily SIS portal scrapes at startup, git-pulls per session. All snapshot reads are filesystem I/O — no API calls at runtime. Rolling index provides pre-computed change counts; individual diffs computed on demand.
 
@@ -53,7 +53,7 @@ personas/
   config.json          ← Committed. Provider choices, temperature. No secrets.
   config.local.json    ← Gitignored. Real names, service IDs.
   example/persona.md   ← Committed. Template for new personas.
-  <pseudonym>/         ← Gitignored. persona.md + source media.
+  <pseudonym>/         ← Tracked. persona.md committed; source media (.jpg/.png/.mp4/etc.) gitignored by extension.
 ```
 
 `load_persona()` merges `config.json` + `config.local.json`, concatenates `base.md` + `persona.md`, and templates placeholders at runtime. Adding a new persona requires zero code changes — just a subdirectory, a markdown file, and a config entry.
@@ -79,7 +79,8 @@ uv run python src/agent.py console          # Run in terminal
 **Environment variables** (`.env.local`):
 - `LIVEKIT_URL`, `LIVEKIT_API_KEY`, `LIVEKIT_API_SECRET` — LiveKit Cloud
 - `DATA_REPO_URL` — Git URL for snapshot data repo
-- `HEDRA_API_KEY` — Hedra avatar (optional)
+- `ANTHROPIC_API_KEY` — Claude Sonnet 4.6 LLM + Claude Haiku 4.5 deferred summarization (required)
+- `SIMLI_API_KEY` — Simli avatar (optional)
 - `ELEVEN_API_KEY` — ElevenLabs TTS/voice cloning (optional)
 - `LEMONSLICE_API_KEY` — LemonSlice avatar (optional)
 - `SUPABASE_URL`, `SUPABASE_KEY` — Supabase (optional, for user profiles)
@@ -87,7 +88,7 @@ uv run python src/agent.py console          # Run in terminal
 ### Testing
 
 ```bash
-uv run pytest                               # All tests (143 total: 132 non-LLM + 11 LLM-dependent)
+uv run pytest                               # All tests (169 total)
 uv run pytest tests/test_analysis.py        # Data layer only (no API keys needed)
 uv run pytest tests/test_navigation.py      # Navigation + date resolution (no API keys needed)
 uv run pytest tests/test_user_store.py      # UserStore with mocked Supabase (no API keys needed)
@@ -117,6 +118,8 @@ The focus throughout:
 ### Related
 
 - [table-mutation-tracker](https://github.com/dlasley/table-mutation-tracker) — Frontend calendar UI + agent widget (branch `feature/livekit-agent-widget`)
+- [ARCHITECTURE.md](docs/ARCHITECTURE.md) — Runtime boundaries, deterministic/nondeterministic layers, failure modes, persona config architecture
+- [CONTRACTS.md](docs/CONTRACTS.md) — RPC navigation contract + snapshot JSON schema with contract tests
 - [PLAN.md](docs/PLAN.md) — Full implementation plan, provider decisions, future phases
 - [AVATAR_PROVIDERS.md](docs/AVATAR_PROVIDERS.md) — Avatar and voice provider research
 
