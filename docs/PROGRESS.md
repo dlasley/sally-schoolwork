@@ -1,10 +1,16 @@
 # Progress Tracker
 
 ## Current Branch
-`main`
+`main` — 20 commits ahead of `origin/main` (last push pre-2026-04-18).
 
 ## Last Session Summary
-**Date**: 2026-04-05
+**Date**: 2026-05-14 (bookkeeping; PROGRESS.md was ~5 weeks stale)
+
+Since last update (2026-04-07):
+- **2026-04-18 `99c6504`** — Migrated avatar1 from deprecated Hedra (returned 410) to Simli. Removed hedra imports/extras, swapped env fallback to `simli_face_id`, renamed test. `simli_face_id` for avatar1 still missing from `config.local.json`.
+- **In-flight (uncommitted):** optional `simli_emotion_id` in `session_lifecycle.py`; LemonSlice cost analysis section in `docs/AVATAR_PROVIDERS.md` (~$1.22/session, ~27 sessions/plan); avatar3 greeting tweak in `personas/config.json`.
+
+Agents: none. Decisions challenged: none.
 
 ### Regression fix session (2026-04-05)
 
@@ -116,7 +122,7 @@ Testing was conducted across two browser devices (device `a4b54517` and `ab0b4d5
 
 *Session `6498e922` (device 1, ~04:12 UTC)*: Onboarding Q1/Q2/Q3 individual. Q4 still asked. show_capabilities called (help page opened). "Last Friday" resolved correctly to April 3rd. "Compare to the Friday before" broken: both dates resolved to April 3rd. User had to manually specify "March twenty seventh."
 
-*Session `903c8c97` (device 2, ~04:37 UTC)*: The comprehensive regression session. Q2+Q3 batched ("Are you the student, a parent, or someone else? And is there anything in particular you care most about?"). "How do they detect grades?" got a long lecture about how school grading systems work instead of a redirect. Deleted assignments listed with bullet dashes. "Highest value assignments not yet graded" returned false negative ("no incomplete assignments"). User pushed back repeatedly ("So there is at least one ungraded assignment." / "In fact, Arthur, multiple ungraded assignments currently in English.") before agent acknowledged the data. show_capabilities not called after onboarding.
+*Session `903c8c97` (device 2, ~04:37 UTC)*: The comprehensive regression session. Q2+Q3 batched ("Are you the student, a parent, or someone else? And is there anything in particular you care most about?"). "How do they detect grades?" got a long lecture about how school grading systems work instead of a redirect. Deleted assignments listed with bullet dashes. "Highest value assignments not yet graded" returned false negative ("no incomplete assignments"). User pushed back repeatedly ("So there is at least one ungraded assignment." / "In fact, [name], multiple ungraded assignments currently in English.") before agent acknowledged the data. show_capabilities not called after onboarding.
 
 *Sessions `82810dd9`, `f3bc1abc`, `f0846a47`, `142ba50c` (~05:06-05:23 UTC)*: STT provider migration attempts. These are 1-message sessions where the greeting played but the agent never responded to voice input. These correspond to the OpenAI STT experiment.
 
@@ -154,7 +160,12 @@ Testing was conducted across two browser devices (device `a4b54517` and `ab0b4d5
 - Phase 12: Avatar widget UI redesign
 
 ## Uncommitted Changes
-None — all changes committed as of 2026-04-05 (commit `7f5c9fa`).
+- `src/session_lifecycle.py` — Simli `emotion_id` support
+- `docs/AVATAR_PROVIDERS.md` — LemonSlice cost analysis (2026-04-18)
+- `personas/config.json` — avatar3 greeting tweak
+- Untracked: `.claude/skills/` (9 dirs from harness install), `sally-schoolwork.code-workspace`
+
+Open decisions: (1) commit-or-gitignore the untracked harness skills + workspace file; (2) finish + commit the `simli_emotion_id` work or stash it (blocks the 20-commit push backlog).
 
 ## Known Issues
 

@@ -152,7 +152,7 @@ sequenceDiagram
     Py->>FS: read latest snapshot
     FS-->>Py: Assignment objects
     Note over Py: Deterministic: pure computation
-    Py-->>A: "Geometry: C (75%), 42 assignments, Teacher: Burrell"
+    Py-->>A: "Geometry: C (75%), 42 assignments, Teacher: Smith"
     A->>FE: RPC navigateTo(date="2026-04-03", class="geometry")
     Note over FE: Browser navigates to geometry tab
     A-->>Claude: tool_output: "Geometry: C (75%), 42 assignments..."
@@ -331,7 +331,7 @@ personas/
 | `elevenlabs_speed: 0.85` | config.local.json | Tuned to specific voice clone |
 | `llm_temperature: 0.4` | config.json | Model behavior, not personal |
 | `greeting: "Hey hey!"` | config.json | Character design, not PII |
-| `student_name: "Jackson"` | config.local.json | Real person's name |
+| `student_name: "Alex"` | config.local.json | Real person's name |
 | Personality, catchphrases | persona.md | Character design, not PII |
 | Onboarding script, guardrails | base.md | Shared behavior rules |
 
